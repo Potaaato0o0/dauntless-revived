@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "date": "2026-10-02T16:10:00-04:00",
+      "title": "Server update: Escalation progression and faster hunt launches",
+      "body": "Real Escalation progression and saving are now enabled. Players without saved progress begin at level 0 instead of the previous placeholder maximum.\n\nThis update also separates player connection limits, releases completed hunt slots sooner, and reduces the delay between server launches. A respawn correction has been deployed for the reported under-map issue; please report any remaining cases.\n\nTraining Grounds, party invitations, and hunt joining are being investigated. Further updates will appear here."
+    }
+  ]
+}
