@@ -1,9 +1,9 @@
 {
   "items": [
     {
-      "date": "2026-10-03T23:45:20.3894470Z",
+      "date": "2026-10-03T23:45:20.389447Z",
       "title": "30 free cosmetics and matchmaking update",
-      "body": "The shop now contains 30 free cosmetic offers, with no bounty-token bundles. Purchases made from the earlier larger free catalog have been revoked using purchase records. Pre-owned items, separately earned items, character progress and escalation progress were preserved. Items bought from the new 30-item shop remain yours.\n\nThe latest merged matchmaking update is being applied to both servers. It handles concurrent groups and repeated joins without allocating duplicate hunts, keeps status requests responsive, and confirms native listening readiness. Identical character-save retries are now accepted without overwriting newer progress. Some native hunt crashes remain under investigation."
+      "body": "The shop now contains 30 free cosmetic offers, with no bounty-token bundles. Purchases made from the earlier larger free catalog have been revoked using purchase records. Pre-owned items, separately earned items, character progress and escalation progress were preserved. Items bought from the new 30-item shop remain yours.\n\nThe latest merged matchmaking update is live on both servers. It handles concurrent groups and repeated joins without allocating duplicate hunts, keeps status requests responsive, and confirms native listening readiness. Identical character-save retries are now accepted without overwriting newer progress. Some native hunt crashes remain under investigation."
     },
     {
       "date": "2026-10-03T22:08:42.1932554Z",
