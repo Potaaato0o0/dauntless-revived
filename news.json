@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-03T03:22:41.8512545Z",
+      "title": "Overflow hunt hosting is live",
+      "body": "New hunts can now be assigned to a second game server when the main server is busy. Party rosters and hunt settings travel together, while accounts and progression remain shared. Existing hunts stay on the host where they started. Capacity checks remain active on both hosts, and game ports open only for authenticated players. This adds room for concurrent hunts; it does not guarantee that every reported gameplay or connection issue is resolved."
+    },
+    {
       "date": "2026-10-03T02:48:45.6723128Z",
       "title": "Training settings, server performance and Discord codes",
       "body": "Training Grounds now starts with its explicit game mode and 12-player catalog capacity. Server networking now avoids repeated channel scans and unnecessary replication work in empty worlds. Hunt capacity was expanded, and additional overflow hosting is being prepared. Revived Warden now supports /key claim to DM a single-use registration code and /key status to check redemption. Enter the code when creating your account in the launcher. Launcher 0.1.16 refreshes news automatically. If the Windows installer fails, the Windows ZIP on the release page can be extracted and run directly."
