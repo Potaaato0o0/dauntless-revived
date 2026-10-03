@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-03T23:45:20.3894470Z",
+      "title": "30 free cosmetics and matchmaking update",
+      "body": "The shop now contains 30 free cosmetic offers, with no bounty-token bundles. Purchases made from the earlier larger free catalog have been revoked using purchase records. Pre-owned items, separately earned items, character progress and escalation progress were preserved. Items bought from the new 30-item shop remain yours.\n\nThe latest merged matchmaking update is being applied to both servers. It handles concurrent groups and repeated joins without allocating duplicate hunts, keeps status requests responsive, and confirms native listening readiness. Identical character-save retries are now accepted without overwriting newer progress. Some native hunt crashes remain under investigation."
+    },
+    {
       "date": "2026-10-03T22:08:42.1932554Z",
       "title": "Hunt startup improvements, store enabled and bot recovery",
       "body": "Game servers now confirm that a hunt is listening before sending players to it. Matchmaking requests stay responsive during cold starts, and new hunts allow more time for the first player to load. These changes are live on both hosts. Some hunt crashes and capacity-related waits are still under investigation; this update does not claim every menu return is resolved.\n\nThe in-game store is enabled with the current free catalog. Discord key commands now recover automatically after bot-process failures and load their saved configuration on every restart. Existing account keys and saves are unchanged."
