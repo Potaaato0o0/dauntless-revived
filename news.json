@@ -1,7 +1,12 @@
 {
   "items": [
     {
-      "date": "2026-10-03T18:52:53.800Z",
+      "date": "2026-10-03T22:08:42.1932554Z",
+      "title": "Hunt startup improvements, store enabled and bot recovery",
+      "body": "Game servers now confirm that a hunt is listening before sending players to it. Matchmaking requests stay responsive during cold starts, and new hunts allow more time for the first player to load. These changes are live on both hosts. Some hunt crashes and capacity-related waits are still under investigation; this update does not claim every menu return is resolved.\n\nThe in-game store is enabled with the current free catalog. Discord key commands now recover automatically after bot-process failures and load their saved configuration on every restart. Existing account keys and saves are unchanged."
+    },
+    {
+      "date": "2026-10-03T18:52:53.8Z",
       "title": "Poet fix — launcher 0.1.18 and Discord account linking",
       "body": "Launcher 0.1.18 adds the Poet fix for persistent oversized-display startup crashes. Open Settings and enable “Poet fix · safe window (1280×720)”, then press Play. It resets saved display size, mode and position before each launch, including when no broken resolution is saved. Changed settings are backed up; other preferences and your account are preserved. If it still crashes, send a fresh game log from that attempt.\n\nAlready registered using an old Join invite? That invite is not your account key. In launcher Settings, choose “Save a backup of your key…”, then copy the value after Key: into /key link key:. The response is private and linking keeps your original account and progress. Discord command registration has also been stabilized; reload Discord if an old command remains cached.\n\nThe private owner dashboard now displays linked accounts and bot-issued, redeemed, unused, pending and revoked invites. These counts come from saved records and survive dashboard restarts."
     },
