@@ -1,17 +1,20 @@
 {
   "items": [
     {
+      "date": "2026-10-03T18:52:53.800Z",
+      "title": "Poet fix — launcher 0.1.18 and Discord account linking",
+      "body": "Launcher 0.1.18 adds the Poet fix for persistent oversized-display startup crashes. Open Settings and enable “Poet fix · safe window (1280×720)”, then press Play. It resets saved display size, mode and position before each launch, including when no broken resolution is saved. Changed settings are backed up; other preferences and your account are preserved. If it still crashes, send a fresh game log from that attempt.\n\nAlready registered using an old Join invite? That invite is not your account key. In launcher Settings, choose “Save a backup of your key…”, then copy the value after Key: into /key link key:. The response is private and linking keeps your original account and progress. Discord command registration has also been stabilized; reload Discord if an old command remains cached.\n\nThe private owner dashboard now displays linked accounts and bot-issued, redeemed, unused, pending and revoked invites. These counts come from saved records and survive dashboard restarts."
+    },
+    {
       "date": "2026-10-03T06:11:39.654Z",
       "title": "Discord invites fixed and both-server dashboard totals",
       "body": "/key claim now sends a complete dauntless-revived://join invite. Paste the entire invite into the launcher's Join box, then register. If you previously received only a DR code, run /key claim again. An invalid-character issue in generated registration codes has also been corrected. Existing account keys and progression are unchanged.\n\nThe owner dashboard now shows each server's hunts, CPU and RAM together, with combined hunt/RAM totals and a clearly labelled mean CPU. For example, 50% and 5% average to 27.5%. Offline or stale readings are not counted as zero load. Both-server connection checks and private operator documentation have been updated."
     },
-
     {
       "date": "2026-10-03T05:50:07.317Z",
       "title": "Launcher 0.1.17 — joltik! fix and account recovery",
       "body": "Launcher 0.1.17 is available. The joltik! fix checks for missing Microsoft Visual C++ x64 and legacy DirectX components before launch, with official installation links. Unexpected game exits now show an error instead of silently returning to Play.\n\nThe launcher repairs impossible saved display sizes that can cause a Direct3D startup crash, backing up the old settings first. It also checks your account key before launching and asks you to restore the original key if the server rejects it.\n\nAlready have an account? Use /key link key:<your original launcher key> to link Discord privately. Linking saves the association in the account database and keeps your existing key and progress. /key claim supplies a registration code, not a replacement login key.\n\nOverflow hosting is active. The owner dashboard now has a Server #2 section with service health, hunts, CPU, memory, disk and process statistics. Please report remaining gameplay issues."
     },
-
     {
       "date": "2026-10-03T03:22:41.8512545Z",
       "title": "Overflow hosting and server CPU update",
