@@ -2,8 +2,8 @@
   "items": [
     {
       "date": "2026-10-03T03:22:41.8512545Z",
-      "title": "Overflow hunt hosting is live",
-      "body": "New hunts can now be assigned to a second game server when the main server is busy. Party rosters and hunt settings travel together, while accounts and progression remain shared. Existing hunts stay on the host where they started. Capacity checks remain active on both hosts, and game ports open only for authenticated players. This adds room for concurrent hunts; it does not guarantee that every reported gameplay or connection issue is resolved."
+      "title": "Overflow hosting and server CPU update",
+      "body": "New hunts can now be assigned to a second game server when the main server is busy. Party rosters and hunt settings travel together, while accounts and progression remain shared. Existing hunts stay on the host where they started. Capacity checks remain active on both hosts, and game ports open only for authenticated players. This adds room for concurrent hunts; it does not guarantee that every reported gameplay or connection issue is resolved. Dedicated game processes now use a 30-frame server tick cap, reducing excess replication work. The cap affects server simulation pacing, not your client rendering FPS."
     },
     {
       "date": "2026-10-03T02:48:45.6723128Z",
