@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "vite";
 
-// https://vitejs.dev/config
+// The page is plain TypeScript and CSS (no framework). Assets are never inlined as data URLs,
+// so the Content-Security-Policy in index.html can stay strict.
 export default defineConfig({
-    plugins: [
-        tailwindcss()
-    ]
+  build: {
+    assetsInlineLimit: 0,
+  },
 });

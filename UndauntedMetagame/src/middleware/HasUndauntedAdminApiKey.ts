@@ -1,7 +1,14 @@
 import { NextFunction, Request, Response } from "express";
 import { GetUserInfoForApiKey, UserInfo } from "../controllers/undauntedapi";
+import { RefuseAdminKeyThroughProxy } from "./RequestOrigin";
 
 export async function HasUndauntedAdminApiKey(req: Request, res: Response, next: NextFunction){
+    // Admin requests never come through the public gateway (or any proxy): 403 before the
+    // key is looked up. Direct callers (the host, or the tailnet in private mode) as before.
+    if(RefuseAdminKeyThroughProxy(req, res)){
+        return;
+    }
+
     const ApiKey = req.headers["x-undaunted-user-api-key"] as string | undefined;
 
     if(ApiKey == undefined){

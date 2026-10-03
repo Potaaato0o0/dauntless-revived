@@ -1,0 +1,15 @@
+#!/bin/ksh
+daemon="@NODE@"
+daemon_flags="--env-file=@CONFIG@/allowlist.env @ROOT@/deploy/openbsd-server/allowlist.mjs"
+daemon_user="root"
+daemon_logger="daemon.info"
+rc_bg=YES
+
+. /etc/rc.d/rc.subr
+
+rc_stop() {
+	${daemon} --env-file=@CONFIG@/allowlist.env @ROOT@/deploy/openbsd-server/allowlist.mjs --close-ports >/dev/null 2>&1 || true
+	pkill -xf "${pexp}" >/dev/null 2>&1 || true
+}
+
+rc_cmd $1

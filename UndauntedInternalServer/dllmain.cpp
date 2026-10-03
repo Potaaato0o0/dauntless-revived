@@ -1,3 +1,8 @@
+#include "ServerFrameLimit.h"
+#include <chrono>
+#include <thread>
+
+
 #include <windows.h>
 #include <shellapi.h>
 #include <string>
@@ -19,6 +24,11 @@
 #include "SDK/lantern_equipped_ab_parameters.hpp"
 
 using namespace SDK;
+
+static bool IsRunningUnderWine() {
+    HMODULE Ntdll = GetModuleHandleW(L"ntdll.dll");
+    return Ntdll != nullptr && GetProcAddress(Ntdll, "wine_get_version") != nullptr;
+}
 
 namespace Globals {
     static bool AmServer = false;
@@ -317,9 +327,30 @@ float TotalNoPlayersTime = 0.0f;
 
 bool EnableWatchdog = true;
 
+// Read-only counters for diagnostics; the net driver's internal tag is not a frame counter.
+extern "C" {
+    __declspec(dllexport) volatile unsigned long long DR_ServerTickCount = 0;
+    __declspec(dllexport) volatile double DR_ServerSimulatedSeconds = 0;
+}
+
 void* OrigGameEngineTick = nullptr;
 
 void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender) {
+    // Network tick settings do not cap this injected per-frame replication loop.
+    // Pace the dedicated game thread using real elapsed time, without a fixed timestep.
+    static const int FrameLimit = [] {
+        wchar_t Setting[32] = {};
+        const auto Length = GetEnvironmentVariableW(L"DR_SERVER_MAX_FPS", Setting, 32);
+        return ParseServerFrameLimit(Length < 32 ? Setting : nullptr);
+    }();
+    static auto PreviousTick = std::chrono::steady_clock::now();
+    if (Globals::AmServer && FrameLimit > 0) {
+        std::this_thread::sleep_until(PreviousTick + std::chrono::microseconds(1000000 / FrameLimit));
+        PreviousTick = std::chrono::steady_clock::now();
+    }
+
+    DR_ServerTickCount = DR_ServerTickCount + 1;
+    DR_ServerSimulatedSeconds = DR_ServerSimulatedSeconds + DeltaTime;
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
 
     if (Globals::Listening) {
@@ -459,27 +490,67 @@ bool IsLevelInitForActorHook(void* a1, char a2) {
 
 void* OrigGetStartSpot = nullptr;
 
-APlayerStart* GetStartSpotHook(void* a1, void* a2, void* a3) {
-    for (int i = 0; i < SDK::UObject::GObjects->Num(); i++)
-    {
+// 0x1368660 is Phoenix's GetPlayerStartForPlayer: it filters AArchonPlayerStart::GroupName and
+// selects with AArchonPlayerState::PlayerStartSlot. Do not replace it with the first global
+// APlayerStart: that can select a start from the wrong group/world and breaks fall/respawn recovery.
+static UWorld* GetObjectWorld(UObject* Object) {
+    for (UObject* Current = Object; Current; Current = Current->Outer) {
+        if (Current->IsA(SDK::UWorld::StaticClass()))
+            return static_cast<UWorld*>(Current);
+    }
+
+    return nullptr;
+}
+
+static AArchonPlayerStart* PickPlayerStartFallback(AArchonPlayerState* PlayerState, const FName& StartGroup, bool MatchGroup) {
+    UWorld* PlayerWorld = GetObjectWorld(PlayerState);
+    std::vector<AArchonPlayerStart*> Candidates;
+
+    for (int i = 0; i < SDK::UObject::GObjects->Num(); i++) {
         SDK::UObject* Obj = SDK::UObject::GObjects->GetByIndex(i);
-
-        if (!Obj)
+        if (!Obj || Obj->IsDefaultObject() || !Obj->IsA(SDK::AArchonPlayerStart::StaticClass()))
             continue;
 
-        if (Obj->IsDefaultObject())
+        auto* Start = static_cast<AArchonPlayerStart*>(Obj);
+        if (PlayerWorld && GetObjectWorld(Start) != PlayerWorld)
+            continue;
+        if (MatchGroup && Start->GroupName != StartGroup)
             continue;
 
-        if (Obj->IsA(SDK::APlayerStart::StaticClass()))
-        {
-            return (APlayerStart*)Obj;
+        Candidates.push_back(Start);
+    }
+
+    if (Candidates.empty())
+        return nullptr;
+
+    const int32 Slot = PlayerState ? PlayerState->PlayerStartSlot : -1;
+    const size_t Index = Slot >= 0 ? static_cast<size_t>(Slot) % Candidates.size() : 0;
+    return Candidates[Index];
+}
+
+AArchonPlayerStart* GetStartSpotHook(AArchonPlayerState* PlayerState, FName StartGroup) {
+    using GetPlayerStartForPlayerFn = AArchonPlayerStart* (*)(AArchonPlayerState*, FName);
+    auto* Start = reinterpret_cast<GetPlayerStartForPlayerFn>(OrigGetStartSpot)(PlayerState, StartGroup);
+    if (Start)
+        return Start;
+
+    Start = PickPlayerStartFallback(PlayerState, StartGroup, true);
+    if (!Start)
+        Start = PickPlayerStartFallback(PlayerState, StartGroup, false);
+
+    if (Globals::EnableLogging) {
+        if (Start) {
+            std::cout << "Native player-start selection returned null; fallback group="
+                      << StartGroup.ToString() << " slot="
+                      << (PlayerState ? PlayerState->PlayerStartSlot : -1) << " -> "
+                      << Start->GetFullName() << std::endl;
+        } else {
+            std::cout << "No player start found for group=" << StartGroup.ToString()
+                      << " slot=" << (PlayerState ? PlayerState->PlayerStartSlot : -1) << std::endl;
         }
     }
 
-    if (Globals::EnableLogging)
-    std::cout << "No startspot found!" << std::endl;
-
-    return nullptr;
+    return Start;
 }
 
 bool ServerTryActivateAbilityInternal(UAbilitySystemComponent* Component, FGameplayAbilitySpecHandle& AbilityHandle, bool InputPressed, FPredictionKey& PredictionKey, FGameplayEventData* TriggerEventData) {
@@ -508,29 +579,61 @@ bool MakeDoDamageHook(void* a1, void* a2, void* a3) {
 
 void* OrigProcessEventClient = nullptr;
 
-void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
-    if (GetAsyncKeyState(VK_F7)) {
-        for (int i = 0; i < SDK::UObject::GObjects->Num(); i++)
-        {
-            SDK::UObject* Obj = SDK::UObject::GObjects->GetByIndex(i);
+static bool IsPurchasableTonic(const UEquipmentItemViewModel* Item) {
+    if (!Item || Item->PurchaseItemId.ToString() != "CURRENCY_NOTES" || Item->PurchaseCost <= 0 || Item->MaxCanPurchase <= 0)
+        return false;
 
-            if (!Obj)
+    const std::string Id = Item->ItemId.ToString();
+    return Id == "QI_ATTACK_SPEED_POTION"
+        || Id == "QI_DAMAGE_BLOCK_POTION"
+        || Id == "QI_DAMAGE_ENRAGEBONUS_POTION"
+        || Id == "QI_EXPOSE_POTION"
+        || Id == "QI_LANTERN_POTION"
+        || Id == "QI_LIFESTEAL_AOE_POTION"
+        || Id == "QI_STAGGER_POTION"
+        || Id == "QI_STAMINA_POTION_00";
+}
+
+static bool IsPotionPurchaseQuestOpen() {
+    for (int i = 0; i < SDK::UObject::GObjects->Num(); i++) {
+        SDK::UObject* Obj = SDK::UObject::GObjects->GetByIndex(i);
+        if (!Obj || Obj->IsDefaultObject() || !Obj->IsA(SDK::UQuestSystemComponent::StaticClass()))
+            continue;
+
+        auto* QuestSystem = static_cast<UQuestSystemComponent*>(Obj);
+        for (UQuest* Quest : QuestSystem->GetAllQuests()) {
+            if (!Quest || Quest->GetId().ToString() != "CR19_S5_Q2C2_Bosun_PotionPurchase")
                 continue;
 
-            if (Obj->IsA(SDK::UArenaMapHuntsFeature::StaticClass()))
-            {
-                UArenaMapHuntsFeature* Quest = (UArenaMapHuntsFeature*)Obj;
-
-                std::cout << Quest->bEnabled << std::endl;
-            }
-        }
-
-        while (GetAsyncKeyState(VK_F7)) {
-
+            const EQuestStatus Status = Quest->GetStatus();
+            return Status == EQuestStatus::Accepted
+                || Status == EQuestStatus::Redeemable
+                || Status == EQuestStatus::Redeemed
+                || Status == EQuestStatus::Available;
         }
     }
 
+    return false;
+}
+
+void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     reinterpret_cast<void(*)(UObject*, UFunction*, void*)>(OrigProcessEventClient)(Object, Function, Parms);
+
+    static UFunction* CanPurchase = nullptr;
+    if (Function == CanPurchase || (!CanPurchase && Function && Function->GetFullName().contains("EquipmentItemViewModel.CanPurchase"))) {
+        CanPurchase = Function;
+
+        auto* Item = Object && Object->IsA(UEquipmentItemViewModel::StaticClass())
+            ? static_cast<UEquipmentItemViewModel*>(Object)
+            : nullptr;
+        auto* Purchase = static_cast<Params::EquipmentItemViewModel_CanPurchase*>(Parms);
+
+        // 1.4.4 gates every normal tonic purchase on CR19_S5_Q2C2_Bosun_PotionPurchase.
+        // Revived can leave that child quest Available while the vendor screen is already open.
+        // Preserve the retail price/affordability gate and only relax this one quest-state mismatch.
+        if (Purchase && !Purchase->ReturnValue && IsPurchasableTonic(Item) && IsPotionPurchaseQuestOpen())
+            Purchase->ReturnValue = true;
+    }
 }
 
 static int NumTimesOnAirshipUpdated = 0;
@@ -638,9 +741,9 @@ void InitClientHooks() {
 
     //MH_EnableHook((void*)(Globals::BaseAddress + 0x347E110));
 
-    //MH_CreateHook((void*)(Globals::BaseAddress + 0x1F61820), ProcessEventClientHook, &OrigProcessEventClient);
+    MH_CreateHook((void*)(Globals::BaseAddress + 0x1F61820), ProcessEventClientHook, &OrigProcessEventClient);
 
-    //MH_EnableHook((void*)(Globals::BaseAddress + 0x1F61820));
+    MH_EnableHook((void*)(Globals::BaseAddress + 0x1F61820));
 
    // MH_CreateHook((void*)(Globals::BaseAddress + 0x3077710), GetActorCallspace, &OrigGetActorCallspace);
 
@@ -892,10 +995,12 @@ void Init() {
         Globals::EnableLogging = true;
 
         if (Globals::EnableLogging) {
-            AllocConsole();
-            FILE* Dummy;
-            freopen_s(&Dummy, "CONOUT$", "w", stdout);
-            freopen_s(&Dummy, "CONIN$", "r", stdin);
+            if (!IsRunningUnderWine()) {
+                AllocConsole();
+                FILE* Dummy;
+                freopen_s(&Dummy, "CONOUT$", "w", stdout);
+                freopen_s(&Dummy, "CONIN$", "r", stdin);
+            }
 
             std::cout << "Welcome to Undaunted v" << UNDAUNTED_INTERNAL_VERSION << "!" << std::endl;
             std::cout << "prod. gwog :3" << std::endl;

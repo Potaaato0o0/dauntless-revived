@@ -1,13 +1,14 @@
 {
-  "name": "undaunteddeployserver",
+  "name": "dauntless-revived-deploy-server",
   "version": "0.0.5",
-  "description": "The deploy server for Undaunted",
+  "description": "The deploy server for Dauntless Revived",
   "license": "AGPL-3.0-only",
   "author": "gwog :3",
   "scripts": {
     "dev": "tsx --env-file=.env src/server.ts",
     "build": "tsc",
-    "start": "node --env-file=.env dist/server.js"
+    "start": "node --env-file=.env dist/server.js",
+    "test": "node -e \"require('fs').rmSync('build',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"build/test/**/*.test.js\""
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
@@ -25,5 +26,11 @@
     "drizzle-kit": "0.31.10",
     "tsx": "4.22.4",
     "typescript": "6.0.3"
+  },
+  "overrides": {
+    "esbuild": "0.25.12",
+    "tsx": {
+      "esbuild": "0.28.2"
+    }
   }
 }

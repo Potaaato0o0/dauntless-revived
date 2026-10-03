@@ -1,0 +1,134 @@
+{%- comment -%}
+  Added to every page's <head> by the just-the-docs theme, after jekyll-seo-tag's tags.
+
+  1. Languages. English pages and their Finnish translations (under fi/) share the same front matter `ref`
+     and differ in `lang`. From that this emits hreflang alternates for every language version, plus
+     x-default = the English page. (<html lang> itself comes from page.lang in _layouts/default.html.)
+  2. Icons, all of the Dauntless Revived emblem and built by brand/build.py: assets/favicon.ico (16, 32
+     and 48 px), assets/icon-192.png and assets/apple-touch-icon.png (180 px, opaque for iOS). The
+     browser's theme colour is the ink brand token, the page background (the tokens are in
+     _sass/custom/setup.scss; `python3 brand/build.py --check` compares the two). Plus noindex on the
+     404 page.
+  3. Size, type and alt text of the default social preview image (assets/og-revived.png: the full logo and one
+     line of text, from brand/build.py).
+  4. JSON-LD. Home page: WebSite + SoftwareSourceCode (the home page sets seo.type to WebPage, so
+     jekyll-seo-tag does not add a second WebSite). FAQ pages: FAQPage built from _data/faq_<lang>.yml,
+     the same data the FAQ page itself renders, so the structured data always matches the visible text.
+{%- endcomment -%}
+{%- assign hc_lang = page.lang | default: site.lang %}
+<link rel="icon" href="{{ '/assets/favicon.ico' | relative_url }}" sizes="16x16 32x32 48x48">
+<link rel="icon" href="{{ '/assets/icon-192.png' | relative_url }}" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="{{ '/assets/apple-touch-icon.png' | relative_url }}">
+<meta name="theme-color" content="#01090D">
+{%- if page.url == "/404.html" %}
+<meta name="robots" content="noindex">
+{%- endif -%}
+
+{%- if page.ref -%}
+  {%- assign hc_versions = site.pages | where: "ref", page.ref -%}
+  {%- if hc_versions.size > 1 -%}
+    {%- for hc_version in hc_versions %}
+<link rel="alternate" hreflang="{{ hc_version.lang | default: site.lang }}" href="{{ hc_version.url | absolute_url }}">
+    {%- endfor -%}
+    {%- assign hc_default = hc_versions | where: "lang", "en" | first -%}
+    {%- if hc_default %}
+<link rel="alternate" hreflang="x-default" href="{{ hc_default.url | absolute_url }}">
+    {%- endif -%}
+    {%- for hc_version in hc_versions -%}
+      {%- if hc_version.url != page.url %}
+<meta property="og:locale:alternate" content="{{ hc_version.locale | default: site.locale }}">
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- if page.image == "/assets/og-revived.png" -%}
+  {%- if hc_lang == "fi" -%}
+    {%- assign hc_alt = "Dauntless Revived -logo: lohikäärmeen pää ja teksti Dauntless Revived. Alla englanniksi: Private server revival of Dauntless 1.4.4 (Dauntless 1.4.4 -pelin yksityinen palvelin)." -%}
+  {%- else -%}
+    {%- assign hc_alt = "The Dauntless Revived logo, a dragon's head above the words Dauntless Revived, and the line: Private server revival of Dauntless 1.4.4." -%}
+  {%- endif %}
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ hc_alt }}">
+<meta name="twitter:image:alt" content="{{ hc_alt }}">
+{%- endif -%}
+
+{%- if page.ref == "index" -%}
+  {%- assign hc_home = "/" | absolute_url -%}
+  {%- assign hc_person = '{"@type":"Person","name":"mixutin","url":"https://github.com/mixutin"}' -%}
+  {%- assign hc_agpl = "https://www.gnu.org/licenses/agpl-3.0.html" %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {%- if hc_lang == "en" %}
+    {
+      "@type": "WebSite",
+      "@id": {{ hc_home | append: "#website" | jsonify }},
+      "url": {{ hc_home | jsonify }},
+      "name": {{ site.title | jsonify }},
+      "description": {{ site.description | strip | jsonify }},
+      "inLanguage": ["en", "fi"],
+      "publisher": {{ hc_person }}
+    },
+    {%- endif %}
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": {{ page.url | absolute_url | append: "#software" | jsonify }},
+      "name": {{ site.title | jsonify }},
+      "description": {{ page.description | jsonify }},
+      "inLanguage": {{ hc_lang | jsonify }},
+      "url": {{ page.url | absolute_url | jsonify }},
+      "codeRepository": "https://github.com/mixutin/dauntless-revived",
+      "license": {{ hc_agpl | jsonify }},
+      "programmingLanguage": ["TypeScript", "C++", "PowerShell"],
+      "runtimePlatform": ["Node.js", "Windows"],
+      "author": {{ hc_person }},
+      "isBasedOn": {
+        "@type": "SoftwareSourceCode",
+        "name": "Undaunted",
+        "codeRepository": "https://github.com/SyST3MDeV/Undaunted",
+        "license": {{ hc_agpl | jsonify }},
+        "author": {"@type": "Person", "name": "gwog"}
+      },
+      "about": {
+        "@type": "VideoGame",
+        "name": "Dauntless",
+        "author": {"@type": "Organization", "name": "Phoenix Labs"},
+        "sameAs": "https://en.wikipedia.org/wiki/Dauntless_(video_game)"
+      }
+    }
+  ]
+}
+</script>
+{%- endif -%}
+
+{%- if page.ref == "faq" -%}
+  {%- assign hc_faq_key = "faq_" | append: hc_lang -%}
+  {%- assign hc_faq = site.data[hc_faq_key] -%}
+  {%- if hc_faq %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "url": {{ page.url | absolute_url | jsonify }},
+  "inLanguage": {{ hc_lang | jsonify }},
+  "mainEntity": [
+    {%- for hc_item in hc_faq -%}
+      {%- capture hc_md -%}{%- include faq_resolve.html md=hc_item.a absolute="1" -%}{%- endcapture -%}
+      {%- assign hc_question = hc_item.q | markdownify | strip_html | strip -%}
+      {%- assign hc_answer = hc_md | markdownify | strip %}
+    {
+      "@type": "Question",
+      "name": {{ hc_question | jsonify }},
+      "url": {{ page.url | absolute_url | append: "#" | append: hc_item.id | jsonify }},
+      "acceptedAnswer": {"@type": "Answer", "text": {{ hc_answer | jsonify }}}
+    }{% unless forloop.last %},{% endunless %}
+    {%- endfor %}
+  ]
+}
+</script>
+  {%- endif -%}
+{%- endif -%}

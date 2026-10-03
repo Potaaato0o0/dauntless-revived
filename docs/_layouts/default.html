@@ -1,0 +1,56 @@
+---
+layout: table_wrappers
+---
+{%- comment -%}
+  Copy of _layouts/default.html from just-the-docs v0.12.0 (the version pinned in _config.yml; update
+  both together). Three changes from the theme's file:
+  1. <html lang> comes from the page's own `lang` (fi for the pages under fi/), so crawlers that do not
+     run JavaScript see the right language. The theme uses site.lang for every page.
+  2. The "Skip to main content" link is in the page's language.
+  3. The home pages (ref "index", English and Finnish) show the full logo above their content
+     (_includes/home_logo.html).
+{%- endcomment -%}
+<!DOCTYPE html>
+
+<html lang="{{ page.lang | default: site.lang | default: 'en-US' }}">
+{% include head.html %}
+<body>
+  <a class="skip-to-main" href="#main-content">{% if page.lang == "fi" %}Siirry pääsisältöön{% else %}Skip to main content{% endif %}</a>
+  {% include icons/icons.html %}
+  {% if page.nav_enabled == true %}
+    {% include components/sidebar.html %}
+  {% elsif layout.nav_enabled == true and page.nav_enabled == nil %}
+    {% include components/sidebar.html %}
+  {% elsif site.nav_enabled != false and layout.nav_enabled == nil and page.nav_enabled == nil %}
+    {% include components/sidebar.html %}
+  {% endif %}
+  <div class="main" id="top">
+    {% include components/header.html %}
+    <div class="main-content-wrap">
+      {% include components/breadcrumbs.html %}
+      <div id="main-content" class="main-content">
+        <main>
+          {% if page.ref == "index" %}{% include home_logo.html %}{% endif %}
+          {% if site.heading_anchors != false %}
+            {% include vendor/anchor_headings.html html=content beforeHeading="true" anchorBody="<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><use xlink:href=\"#svg-link\"></use></svg>" anchorClass="anchor-heading" anchorAttrs="aria-labelledby=\"%html_id%\"" %}
+          {% else %}
+            {{ content }}
+          {% endif %}
+
+          {% if page.has_toc != false %}
+            {% include components/children_nav.html %}
+          {% endif %}
+        </main>
+        {% include components/footer.html %}
+      </div>
+    </div>
+    {% if site.search_enabled != false %}
+      {% include components/search_footer.html %}
+    {% endif %}
+  </div>
+
+  {% if site.mermaid %}
+    {% include components/mermaid.html %}
+  {% endif %}
+</body>
+</html>

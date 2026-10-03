@@ -1,0 +1,22 @@
+{
+  "name": "dauntless-revived-gateway",
+  "version": "0.1.0",
+  "description": "Public front door of a Dauntless Revived server: one TLS port in front of the metagame and the content server, plus the helper that opens the game ports only for players who logged in",
+  "license": "AGPL-3.0-only",
+  "author": "Dauntless Revived contributors",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "start:allowlist": "node --env-file-if-exists=.env dist/allowlist/server.js",
+    "make-cert": "node tools/make-cert.js",
+    "test": "node -e \"require('fs').rmSync('build',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test --test-concurrency=1 \"build/test/*.test.js\""
+  },
+  "dependencies": {
+    "node-forge": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "typescript": "6.0.3"
+  }
+}

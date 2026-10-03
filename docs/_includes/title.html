@@ -1,0 +1,9 @@
+{%- comment -%}
+  Replaces the theme's title.html, the site title link at the top of the sidebar (the top bar on small
+  screens): the emblem, then the site name as text. The theme's `logo:` option would show an image only,
+  and the full logo's lettering cannot be read at the header's 60 px height, so the full logo is on the
+  home page instead (_includes/home_logo.html). The emblem is decorative (empty alt): the link's
+  accessible name stays the site title, in English and Finnish alike.
+{%- endcomment -%}
+<img class="site-emblem" src="{{ '/assets/brand/emblem-128.png' | relative_url }}" width="36" height="36" alt="">
+<span class="site-name">{{ site.title }}</span>

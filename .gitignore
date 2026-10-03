@@ -1,0 +1,40 @@
+# Local Dauntless client files (copyrighted; never commit)
+/BaseGame144/
+/BaseGame144.zip
+
+# Local development environments and caches
+/.venv/
+/.vs/
+/.vscode/
+/__pycache__/
+/.pytest_cache/
+/.test-tmp/
+/.test-tmp-security/
+**/.token-optimizer/
+**/node_modules/
+*.log
+performance*.csv
+
+# Runtime secrets and generated data
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+/data/
+
+# Also never commit game archives, keys or databases
+*.pak
+*.ucas
+*.utoc
+*.key
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-*
+
+# Local backups and tool leftovers (these and the *.sqlite patterns above come from
+# github.com/Harmonicrain/Undaunted 895f7c7)
+*.bak
+*.bak-*
+*.drizzle-generated

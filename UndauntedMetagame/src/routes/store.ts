@@ -1,21 +1,44 @@
 import { Router } from "express";
 import { logger } from "../logger";
 import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth";
-import { GetNotesForUser } from "../controllers/store";
+import { GetHeldCurrencies, GetNotesForUser, OverlayHeldCurrencies } from "../controllers/store";
+import { PlayerTokenOnly } from "../middleware/PlayerAuth";
+import { CreateStorePurchase, GetStoreOffer, IsKnownStoreTag, ListStoreOffers, RedeemStorePurchase, StoreError } from "../controllers/freestore";
+import { BalanceFromInventory, StoreMode } from "../features";
 
 export const storeRouter = Router();
+
+// BALANCE_FROM_INVENTORY=1 (the default; roadmap 2.17): the currencies the account's active character
+// holds replace the sheet's fixed values (controllers/store.ts). Off: the fixed sheet, as before. The
+// idea is from Harmonic's fork (github.com/Harmonicrain/Undaunted 895f7c7), without its wallet table.
+function ApplyHeldCurrencies(AccountId: unknown, Sheet: Record<string, unknown>){
+    if(!BalanceFromInventory() || typeof AccountId !== "string"){
+        return;
+    }
+
+    const { CharacterId, Held } = GetHeldCurrencies(AccountId);
+    const Changed = OverlayHeldCurrencies(Sheet, Held);
+
+    if(Changed.length > 0){
+        logger.info(`Balances of ${AccountId} from the inventory of character ${CharacterId}: ${Changed.map((Key) => `${Key} ${Sheet[Key]}`).join(", ")}`);
+    }
+}
 
 storeRouter.post("/reconcile", HasUndauntedMetagameAuth, async (req: any, res) => {
     const Notes = await GetNotesForUser(req.AuthData.userId);
 
     logger.info(`Retrieved notes balance of ${Notes} for ${req.AuthData.userId}`);
 
+    const Balances: Record<string, unknown> = {
+        id_currency_notes: Notes,
+        CURRENCY_NOTES: Notes
+    };
+
+    ApplyHeldCurrencies(req.AuthData.userId, Balances);
+
     res.status(200);
     res.json({
-        balances: {
-            id_currency_notes: Notes,
-            CURRENCY_NOTES: Notes
-        },
+        balances: Balances,
         refreshInventory: true
     });
 });
@@ -38,8 +61,7 @@ storeRouter.get("/balance", HasUndauntedMetagameAuth, async (req: any, res) => {
 
     logger.info(`Fetched notes balance of ${NotesBalance} for userId ${UserId}`);
 
-    res.status(200);
-    res.json({
+    const Sheet: Record<string, unknown> = {
         id_currency_s20_coin: 0,
         CURRENCY_GAUNTLET_COIN_FADED: 0,
         CURRENCY_S20_COIN: 0,
@@ -92,9 +114,101 @@ storeRouter.get("/balance", HasUndauntedMetagameAuth, async (req: any, res) => {
         id_currency_s14_coin: 0,
         CURRENCY_EVENT_RAMSGIVING: 0,
         id_currency_s17_coin: 0
-    });
+    };
+
+    ApplyHeldCurrencies(UserId, Sheet);
+
+    res.status(200);
+    res.json(Sheet);
 });
 
+// ---- The free store (roadmap 3.7, controllers/freestore.ts): only with STORE=free. ----
+// With STORE=off (the default) these routes step aside: the storefront gets the old 400 below and the
+// three purchase routes the catalogue-less 404 they always got. Every store route acts for the player
+// whose token it carries; a game server's key alone gets 403. The four routes are adapted from the
+// store routes of Harmonic's fork (github.com/Harmonicrain/Undaunted 895f7c7, routes/store.ts).
+
+function StoreOn(req: any, res: any, next: any){
+    next(StoreMode() === "free" ? undefined : "route");
+}
+
+function SendStoreError(res: any, error: unknown, What: string){
+    if(error instanceof StoreError){
+        logger.warn(`Store ${What} refused (${error.Status}): ${error.message}`);
+        res.status(error.Status);
+        res.json({ code: String(error.Status), message: error.message });
+        return;
+    }
+
+    logger.error(error, `Store ${What} failed`);
+    res.status(500);
+    res.json({ code: "500", message: "Store request failed" });
+}
+
+// StoreGetItemByTagEndpoint: a bare array of offers
+storeRouter.get("/product/skus/public", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+    const RequiredTags = req.query.requiredTags;
+
+    if(typeof RequiredTags !== "string" || RequiredTags.length === 0){
+        logger.warn("Store SKU request with no requiredTags");
+        res.status(400);
+        res.json({ code: "400", message: "missing requiredTags query parameter" });
+        return;
+    }
+
+    try{
+        const Offers = ListStoreOffers(req.AuthData.userId, RequiredTags);
+
+        if(IsKnownStoreTag(RequiredTags)){
+            logger.info(`Store SKUs for tag ${RequiredTags}: ${Offers.length} offer(s)`);
+        }
+        else{
+            logger.warn(`Store SKUs requested for unknown tag ${RequiredTags}: an empty list`);
+        }
+
+        res.status(200);
+        res.json(Offers);
+    }
+    catch(error){
+        SendStoreError(res, error, `list ${RequiredTags}`);
+    }
+});
+
+// StoreGetItemByIdEndpoint: one offer, for the purchase dialog
+storeRouter.get("/product/sku/:skuId", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+    try{
+        res.status(200);
+        res.json(GetStoreOffer(req.AuthData.userId, req.params.skuId));
+    }
+    catch(error){
+        SendStoreError(res, error, `offer ${req.params.skuId}`);
+    }
+});
+
+// StorePurchaseItemEndpoint: {purchaseToken}. Whatever else the request carries is ignored.
+storeRouter.get("/token/:currency/:skuId", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+    try{
+        res.status(200);
+        res.json(CreateStorePurchase(req.AuthData.userId, req.params.currency, req.params.skuId));
+    }
+    catch(error){
+        SendStoreError(res, error, `token for ${req.params.skuId}`);
+    }
+});
+
+// StorePurchaseItemConfirmEndpoint: redeems the token; 204, also for a token already redeemed
+storeRouter.post("/notification/:currency", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+    try{
+        RedeemStorePurchase(req.AuthData.userId, req.params.currency, req.query.token);
+        res.status(204);
+        res.send();
+    }
+    catch(error){
+        SendStoreError(res, error, "purchase");
+    }
+});
+
+// STORE=off: the answer the store screen always got
 storeRouter.get("/product/skus/public", HasUndauntedMetagameAuth, async (req: any, res) => {
     logger.info("Store SKUs (stubbed)");
 
@@ -105,6 +219,6 @@ storeRouter.get("/product/skus/public", HasUndauntedMetagameAuth, async (req: an
     res.status(400);
     res.json({
         code: "400",
-        message: "Undaunted does not support the store (yet)"
+        message: "The store is not available on Dauntless Revived yet."
     });
 });

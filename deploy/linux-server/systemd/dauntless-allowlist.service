@@ -1,0 +1,19 @@
+[Unit]
+Description=Dauntless Revived nftables allowlist
+After=network-online.target
+Wants=network-online.target
+Before=dauntless-gateway.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=@ROOT@
+ExecStart=@NODE@ --env-file=@CONFIG@/allowlist.env @ROOT@/deploy/linux-server/allowlist.mjs
+ExecStopPost=@NODE@ --env-file=@CONFIG@/allowlist.env @ROOT@/deploy/linux-server/allowlist.mjs --close-ports
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

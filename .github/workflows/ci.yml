@@ -1,0 +1,537 @@
+# Checks every push and pull request:
+#  - the four server packages: npm ci, build, unit tests
+#  - the launcher: typecheck, unit tests and the Windows installer, kept as a download for 7 days
+#  - the separate Linux and OpenBSD server ports (native Node services, Wine/SSH game launch wrappers, nftables/PF)
+#  - the Windows Server kit under Windows PowerShell 5.1: parse check, PSScriptAnalyzer errors, and the
+#    kit's own tests (unit checks, remote deployment against a local folder, an end-to-end sandbox install)
+#  - the docs site: generated files current, and the same Jekyll build GitHub Pages runs
+#  - repository hygiene: no secrets or game files in the tracked files or in the commits being pushed
+#    (tools/ci/check-repo.js)
+#
+# Automatic launcher releases are ON: set the repository variable LAUNCHER_AUTO_RELEASE to false
+# (Settings > Secrets and variables > Actions > Variables) to pause them. A push to dauntless-revived that passes
+# every check, is still the head of the branch, and whose UndauntedLauncher/package.json version has no
+# published launcher-v<version> release yet publishes that version (launcher-release.yml) with the
+# installer built and tested here. While paused, Actions > Launcher release > Run workflow
+# publishes by hand.
+#
+# The same checks, run locally: see "Checks" in CONTRIBUTING.md. Actions are pinned by commit.
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time per branch or pull request; a newer push to a pull request cancels the older run.
+# Every run on dauntless-revived gets its own group, so none of them is ever cancelled or replaced.
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/dauntless-revived' && github.run_id || 'latest' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  node-packages:
+    name: ${{ matrix.package }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - UndauntedMetagame
+          - UndauntedGateway
+          - UndauntedContent
+          - UndauntedDeployServer
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      # UndauntedContent's test:integration is not run here: it serves a real 1.4.4 install, which CI
+      # does not have (without one every test in it is skipped).
+      - name: Unit tests
+        run: npm test
+
+  launcher:
+    name: Launcher
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: UndauntedLauncher
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: UndauntedLauncher/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build the installer
+        run: npm run make
+
+      - name: Collect the release files and their SHA-256 sums
+        run: ./scripts/collect-release.ps1
+
+      # The installer of every push, to try before a release. A release publishes this same artifact.
+      # Not kept for pull requests from forks: their code is not reviewed yet, and a download on this
+      # repository's run page would look official.
+      - name: Keep the installer for a week
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: launcher-windows
+          path: UndauntedLauncher/release/
+          if-no-files-found: error
+          retention-days: 7
+
+
+  launcher-linux:
+    name: Launcher (Linux x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: UndauntedLauncher
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: UndauntedLauncher/package-lock.json
+
+      - name: Install Linux package tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm fakeroot squashfs-tools
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests on Linux
+        run: npm test
+
+      - name: Build Linux packages
+        run: npm run make:linux
+
+      - name: Collect Linux release files and SHA-256 sums
+        run: npm run collect:linux
+
+      - name: Keep Linux packages for a week
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: launcher-linux
+          path: UndauntedLauncher/release-linux/
+          if-no-files-found: error
+          retention-days: 7
+
+
+  server-port-linux:
+    name: Server port (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            UndauntedMetagame/package-lock.json
+            UndauntedGateway/package-lock.json
+            UndauntedContent/package-lock.json
+            UndauntedDeployServer/package-lock.json
+
+      - name: Build and test the native server services on Linux
+        run: |
+          set -euo pipefail
+          for pkg in UndauntedMetagame UndauntedGateway UndauntedContent UndauntedDeployServer; do
+            echo "::group::$pkg"
+            (cd "$pkg" && npm ci --no-audit --no-fund && npm run build && npm test)
+            echo "::endgroup::"
+          done
+
+      - name: Test the Unix game-worker and platform config ports
+        run: node --test deploy/linux-server/tests/*.test.mjs
+
+      - name: Parse the Linux and OpenBSD service scripts
+        run: |
+          set -euo pipefail
+          sh -n deploy/linux-server/install.sh deploy/linux-server/install-worker.sh deploy/linux-server/prepare-game.sh deploy/linux-server/stack.sh
+          for file in deploy/openbsd-server/*.ksh deploy/openbsd-server/rc.d/*; do
+            bash -n "$file"
+          done
+          node --check deploy/unix-common/*.mjs
+          node --check deploy/linux-server/*.mjs
+          node --check deploy/openbsd-server/*.mjs
+
+  server-port-openbsd:
+    name: Server port (OpenBSD 7.9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and test inside OpenBSD
+        uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
+        with:
+          release: "7.9"
+          copyback: false
+          prepare: |
+            pkg_add node git
+            # Unlike Linux, OpenBSD requires every synthetic 127.0.0.x test peer to be
+            # assigned explicitly. Gateway tests use these aliases to model independent clients.
+            for n in 2 3 4 5 6 20 21 22 23 24 25 30 31 32 40 42; do
+              ifconfig lo0 inet 127.0.0.$n/32 alias
+            done
+          run: |
+            set -eu
+            node --version
+            npm --version
+            for pkg in UndauntedMetagame UndauntedGateway UndauntedContent UndauntedDeployServer; do
+              echo "=== $pkg ==="
+              (cd "$pkg" && npm ci --no-audit --no-fund && npm run build && npm test)
+            done
+            node --test deploy/linux-server/tests/game-runner.test.mjs
+            for file in deploy/openbsd-server/*.ksh deploy/openbsd-server/rc.d/*; do
+              ksh -n "$file"
+            done
+            node --check deploy/unix-common/generate-config.mjs
+            node --check deploy/unix-common/new-invite.mjs
+            node --check deploy/openbsd-server/allowlist.mjs
+            node --check deploy/openbsd-server/launch-gameserver.mjs
+            tmp="$(mktemp -d /tmp/dr-openbsd-ci.XXXXXX)"
+            mkdir -p "$tmp/game"
+            printf '%s\n' dummy > "$tmp/worker.key"
+            node deploy/unix-common/generate-config.mjs \
+              --platform openbsd --root "$PWD" --data "$tmp/data" --config "$tmp/config" \
+              --game-dir "$tmp/game" --my-ip 203.0.113.10 --mode public \
+              --worker-host 10.0.0.2 --worker-user dauntless --worker-key "$tmp/worker.key" \
+              --worker-command dr-game-worker
+            (cd UndauntedMetagame && node --env-file="$tmp/config/metagame.env" -e 'require("./dist/db.js").GetDb()')
+            node deploy/unix-common/dr-db.cjs integrity "$PWD/UndauntedMetagame" "$tmp/data/undaunted.db"
+            ksh deploy/openbsd-server/configure-pf.ksh \
+              --mode public --interface vio0 --worker-interface vio0 --worker-ip 10.0.0.2 \
+              --output "$tmp/pf.conf"
+            pfctl -nf "$tmp/pf.conf"
+
+  internal-server-dll:
+    name: Server DLL (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build Release x64 with Visual Studio 2022
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          if (-not $msbuild) { throw 'MSBuild not found' }
+          & $msbuild UndauntedInternalServer\UndauntedInternalServer.sln /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify DLL output
+        run: |
+          $dll = Get-ChildItem -Path UndauntedInternalServer -Filter UndauntedInternalServer.dll -Recurse |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]Release[\\/]' } |
+            Select-Object -First 1
+          if (-not $dll) { throw 'Release x64 DLL not found' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll.FullName).Hash.ToLowerInvariant()
+          Write-Output "DLL: $($dll.FullName)"
+          Write-Output "SHA256: $hash"
+          Copy-Item -LiteralPath $dll.FullName -Destination "$env:RUNNER_TEMP\UndauntedInternalServer.dll"
+
+      - name: Keep candidate DLL
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: internal-server-dll
+          path: ${{ runner.temp }}/UndauntedInternalServer.dll
+          if-no-files-found: error
+          retention-days: 7
+
+  server-kit:
+    name: Server kit (Windows PowerShell 5.1)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The sandbox test builds all four server packages with npm ci, so their lockfiles key the cache.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            UndauntedMetagame/package-lock.json
+            UndauntedGateway/package-lock.json
+            UndauntedContent/package-lock.json
+            UndauntedDeployServer/package-lock.json
+
+      - name: Every PowerShell script parses in Windows PowerShell 5.1
+        run: |
+          $files = @(git ls-files -- '*.ps1')
+          $bad = 0
+          foreach ($f in $files) {
+            $tokens = $null; $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $f).Path, [ref]$tokens, [ref]$errors)
+            foreach ($e in $errors) { $bad++; Write-Output "::error file=$f,line=$($e.Extent.StartLineNumber)::$($e.Message)" }
+          }
+          if ($bad) { throw "$bad parse error(s)" }
+          Write-Output "$($files.Count) scripts parse in PowerShell $($PSVersionTable.PSVersion)"
+
+      # PSScriptAnalyzer comes with the runner image; it is never installed from the gallery here.
+      - name: PSScriptAnalyzer (errors only)
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Write-Output '::notice::PSScriptAnalyzer is not installed on this runner; skipped'
+            exit 0
+          }
+          Import-Module PSScriptAnalyzer
+          $files = @(git ls-files -- '*.ps1')
+          $count = 0
+          foreach ($f in $files) {
+            foreach ($r in @(Invoke-ScriptAnalyzer -Path $f -Severity Error)) {
+              $count++
+              Write-Output "::error file=$f,line=$($r.Line)::$($r.RuleName): $($r.Message)"
+            }
+          }
+          if ($count) { throw "PSScriptAnalyzer: $count error(s)" }
+          Write-Output "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version): no errors in $($files.Count) scripts"
+
+      - name: Install the gateway's dependencies (Test-KitUnit uses its certificate tool)
+        shell: pwsh
+        working-directory: UndauntedGateway
+        run: npm ci --no-audit --no-fund
+
+      - name: Unit checks (Test-KitUnit.ps1)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy\windows-server\tests\Test-KitUnit.ps1 -WorkDir "$env:RUNNER_TEMP\dr-kit-unit"
+
+      - name: Remote deployment against a local folder (Test-DeployRemote.ps1)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy\windows-server\tests\Test-DeployRemote.ps1 -WorkDir "$env:RUNNER_TEMP\dr-deploy-test"
+
+      - name: End-to-end sandbox install (Test-Sandbox.ps1)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy\windows-server\tests\Test-Sandbox.ps1 -SandboxDir "$env:RUNNER_TEMP\dr-sandbox"
+
+      # Test-Sandbox.ps1 leaves its log in %TEMP%. The sandbox's keys and secrets were made for this run
+      # and deleted with it, and the kit never prints them.
+      - name: Find the sandbox log
+        if: failure()
+        run: |
+          $log = Join-Path $env:TEMP 'dr-sandbox-test.log'
+          if (Test-Path -LiteralPath $log) { Copy-Item -LiteralPath $log -Destination $env:RUNNER_TEMP }
+
+      - name: Keep the sandbox log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sandbox-test-log
+          path: ${{ runner.temp }}/dr-sandbox-test.log
+          if-no-files-found: ignore
+          retention-days: 5
+
+  docs:
+    name: Docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # sync-roadmap first: build-llms reads the roadmap page it writes.
+      - name: Performance report tests
+        run: node --test tools/summarize-performance.test.mjs tools/dashboard.test.mjs tools/discord-status.test.mjs
+
+      - name: Generated files are current (docs/roadmap.md, docs/llms.txt, docs/llms-full.txt)
+        run: |
+          node tools/sync-roadmap.js
+          node tools/build-llms.js
+          if ! git diff --exit-code --stat; then
+            echo "::error::Generated docs files are out of date. Run node tools/sync-roadmap.js and node tools/build-llms.js, then commit the result."
+            exit 1
+          fi
+
+      # The same build GitHub Pages runs for this site (branch dauntless-revived, folder /docs). The action
+      # is pinned by commit; its Docker image (ghcr.io/actions/jekyll-build-pages) by version tag only, so
+      # this job keeps read-only permissions and no secrets.
+      - name: Build the site like GitHub Pages
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1.0.13
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: The built site has its main pages
+        run: |
+          for page in index.html fi/index.html setup/index.html setup/linux.html setup/windows-server.html setup/linux-server.html setup/openbsd-server.html fi/setup/index.html fi/setup/linux.html fi/setup/linux-server.html fi/setup/openbsd-server.html roadmap.html 404.html \
+                      llms.txt llms-full.txt sitemap.xml assets/css/just-the-docs-default.css assets/js/search-data.json; do
+            test -s "_site/$page" || { echo "::error::_site/$page is missing"; exit 1; }
+          done
+          echo "site built: $(find _site -type f | wc -l) files"
+
+  repo-hygiene:
+    name: No secrets or game files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The whole history, so the commits of this push or pull request can be checked too.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # A secret committed and deleted again within one push is still public in the history, so every
+      # commit the push or pull request brings is checked, not only the files at its end.
+      - name: Check the tracked files, the new commits and the launcher version
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          since=""
+          if [ "$EVENT" = pull_request ]; then
+            since="$PR_BASE"
+          elif [ "$EVENT" = push ] && [ -n "${BEFORE//0/}" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            since="$BEFORE"
+          elif [ "$REF" != "refs/heads/$DEFAULT_BRANCH" ] && git rev-parse -q --verify "origin/$DEFAULT_BRANCH^{commit}" >/dev/null; then
+            # A new branch, a forced push or a manual run: the commits the branch has on top of the default branch.
+            since="origin/$DEFAULT_BRANCH"
+          fi
+          if [ -n "$since" ]; then
+            node tools/ci/check-repo.js --history "$since..HEAD"
+          else
+            echo "::notice::no earlier commit to compare with; only the checked-out files are checked"
+            node tools/ci/check-repo.js
+          fi
+
+  # On by default; the repository variable LAUNCHER_AUTO_RELEASE=false pauses it (see the top of this file).
+  release-check:
+    name: Launcher release needed?
+    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, internal-server-dll, server-kit, docs, repo-hygiene]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/dauntless-revived' &&
+      github.repository == 'mixutin/dauntless-revived' && vars.LAUNCHER_AUTO_RELEASE != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: UndauntedLauncher/package.json
+          sparse-checkout-cone-mode: false
+
+      # A first look; launcher-release.yml decides again, under its lock, right before publishing.
+      - name: Is this version published yet, and is this still the head of the branch?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./UndauntedLauncher/package.json").version')"
+          tag="launcher-v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          publish=false
+          if out="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq .html_url 2>&1)"; then
+            echo "$tag is published already ($out). Raise the version in UndauntedLauncher/package.json to publish a new one."
+          elif ! grep -q 'HTTP 404' <<<"$out"; then
+            echo "::error::could not look up the release $tag: $out"
+            exit 1
+          else
+            head="$(gh api "repos/$GH_REPO/git/ref/heads/$BRANCH" --jq .object.sha)"
+            if [ "$head" = "$COMMIT" ]; then
+              echo "$tag is not published yet: publishing launcher $version"
+              publish=true
+            else
+              echo "::notice::$BRANCH has moved on to ${head:0:12}; the run of the newer commit publishes launcher $version"
+            fi
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+  release-launcher:
+    name: Publish launcher ${{ needs.release-check.outputs.version }}
+    needs: release-check
+    if: needs.release-check.outputs.publish == 'true'
+    # What launcher-release.yml's jobs need: releases and tags, and the signed build provenance attestation.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/launcher-release.yml
+    with:
+      version: ${{ needs.release-check.outputs.version }}
+      artifact: launcher-windows
+      linux_artifact: launcher-linux

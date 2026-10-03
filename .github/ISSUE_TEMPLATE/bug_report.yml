@@ -1,0 +1,98 @@
+name: Bug report
+description: Something in Dauntless Revived does not work as it should.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. You can write in English or in Finnish (suomeksi).
+
+        **Security problem?** Do not use this form. Report it privately: https://github.com/mixutin/dauntless-revived/security/advisories/new
+        **Just a question?** Ask in Discussions instead: https://github.com/mixutin/dauntless-revived/discussions
+
+        **Before you paste logs:** remove account keys, tokens, `.env` values and anything else secret.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and the troubleshooting page (https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html).
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+        - label: I removed keys, tokens, `.env` values and other private data from everything below.
+          required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part is affected?
+      options:
+        - Metagame (backend)
+        - Deploy server
+        - Game server (Ramsgate, hunts, Training Dojo)
+        - Server DLL (UndauntedInternalServer)
+        - Friend kit (setup or launcher)
+        - Docs site
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem. Include any error message exactly as it appeared.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, step by step? Did it happen once or every time?
+      placeholder: |
+        1. Start the stack
+        2. Log in and go to Ramsgate
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or friend kit version
+      description: The commit you run (`git rev-parse --short HEAD`), or the version in the friend kit's SOURCE.txt.
+      placeholder: e.g. f557d74
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Where did it happen?
+      options:
+        - On the host PC
+        - On a friend's PC
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11 23H2
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: A short excerpt from the metagame, deploy server or game server log. It is formatted as code automatically.
+      render: shell
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots of error messages, what you already tried, or anything that changed recently.

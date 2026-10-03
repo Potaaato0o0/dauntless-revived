@@ -1,0 +1,23 @@
+{
+  "name": "dauntless-revived-content",
+  "version": "0.1.0",
+  "description": "Content server for Dauntless Revived: serves the verified 1.4.4 game files to registered accounts, plus the host's news and art pack",
+  "license": "AGPL-3.0-only",
+  "author": "Dauntless Revived contributors",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "verify": "node --env-file-if-exists=.env dist/verify.js",
+    "test": "node -e \"require('fs').rmSync('build',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"build/test/*.test.js\"",
+    "test:integration": "node -e \"require('fs').rmSync('build',{recursive:true,force:true})\" && tsc && tsc -p tsconfig.test.json && node --test --test-concurrency=1 \"build/test/integration/*.itest.js\""
+  },
+  "dependencies": {
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "@types/yauzl": "^3.4.0",
+    "typescript": "6.0.3"
+  }
+}

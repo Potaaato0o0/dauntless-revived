@@ -12,6 +12,7 @@ function StatusForInventoryError(Error: InventoryError){
         case "not_found":
             return 404;
         case "conflict":
+        case "insufficient_quantity":
             return 409;
         case "invalid_inventory_item":
             return 400;
@@ -61,23 +62,26 @@ inventoryRouter.post("/inventory", HasUndauntedMetagameAuth, async (req: any, re
     const StackedItemsToRemove = req.body.removeStackedItems;
     const InstancedItemsToSave = req.body.saveInstancedItems;
 
-    const TransactionResult = await RunInventoryTransaction(UserId, CharacterId, TransactionId, InstancedItemsToAdd, StackedItemsToAdd, InstancedItemsToRemove, StackedItemsToRemove, InstancedItemsToSave);
+    const TransactionResult = await RunInventoryTransaction(UserId, CharacterId, TransactionId, InstancedItemsToAdd, StackedItemsToAdd, InstancedItemsToRemove, StackedItemsToRemove, InstancedItemsToSave, {
+        Caller: req.AuthData.IsGameserver ? "gameserver" : "client",
+        Source: req.body.source
+    });
 
     if(TransactionResult.success){
-        logger.info(`Ran transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId}`);
+        if(TransactionResult.data!.replayed){
+            logger.warn(`Replayed the stored result of transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId}; the retry changed nothing`);
+        }
+        else{
+            logger.info(`Ran transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId}`);
+        }
 
         res.status(200);
-        res.json({
-            createdInstancedItems: InstancedItemsToAdd,
-            updatedInstancedItems: [], // TODO: Actually properly diff & merge the JSON blobs
-            updatedStackedItems: TransactionResult.data != undefined ? TransactionResult.data : [],
-            removedInstancedItems: InstancedItemsToRemove
-        });
+        res.json(TransactionResult.data!.response);
 
         return;
     }
     else{
-        logger.error(`transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId} FAILED!`);
+        logger.error(`transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId} FAILED! (${TransactionResult.error}, answered ${StatusForInventoryError(TransactionResult.error)})`);
 
         res.status(StatusForInventoryError(TransactionResult.error));
         res.send();
@@ -93,7 +97,9 @@ inventoryRouter.post("/inventory/instanceditem", HasUndauntedMetagameAuth, async
     const ItemData = req.body.itemData;
     const UpdateVersion = req.body.updateVersion;
 
-    const ItemResult = await UpdateInstancedItem(CharacterId, UserId, InstanceId, CatalogId, ItemData, UpdateVersion);
+    const ItemResult = await UpdateInstancedItem(CharacterId, UserId, InstanceId, CatalogId, ItemData, UpdateVersion, {
+        Caller: req.AuthData.IsGameserver ? "gameserver" : "client"
+    });
 
     if(ItemResult.success){
         res.status(200);

@@ -67,17 +67,20 @@ export async function QueryEncounteredContent(userId: string, characterId: strin
     );
 }
 
+// The read and the write of each operation below are one synchronous SQLite
+// transaction. They used to be separate awaited queries, so two requests could
+// both read the old list and the second write dropped the first one's entry.
 export async function AddEncounteredContent(userId: string, characterId: string, contentType: number, contentId: string): Promise<ProgressionResult>{
     return RunProgressionOperation(
         userId,
         characterId,
         `Invalid encountered content data while adding ${contentId} for characterId ${characterId} and userId ${userId}`,
         `Failed to add encountered content ${contentId} for characterId ${characterId} and userId ${userId}`,
-        async () => {
-            const EncounteredContentFromDB = await GetDb().query.encounteredcontent.findFirst({where: EncounteredContentFor(userId, characterId)});
+        () => GetDb().transaction((tx) => {
+            const EncounteredContentFromDB = tx.query.encounteredcontent.findFirst({where: EncounteredContentFor(userId, characterId)}).sync();
 
             if(EncounteredContentFromDB == undefined){
-                await GetDb().insert(encounteredcontent).values({userId: userId, characterId: characterId, encounteredcontent: "[]"});
+                tx.insert(encounteredcontent).values({userId: userId, characterId: characterId, encounteredcontent: "[]"}).run();
             }
 
             const ParsedEncounteredContent = JSON.parse(EncounteredContentFromDB?.encounteredcontent ?? "[]");
@@ -91,10 +94,10 @@ export async function AddEncounteredContent(userId: string, characterId: string,
                 category: contentType
             });
 
-            await GetDb().update(encounteredcontent).set({
+            tx.update(encounteredcontent).set({
                 encounteredcontent: JSON.stringify(ParsedEncounteredContent),
-            }).where(EncounteredContentFor(userId, characterId));
-        }
+            }).where(EncounteredContentFor(userId, characterId)).run();
+        })
     );
 }
 
@@ -104,25 +107,25 @@ export async function GetBreadcrumbsForCharacterIdAndUserId(userId: string, char
         characterId,
         `Invalid breadcrumb data for characterId ${characterId} and userId ${userId}`,
         `Failed to fetch breadcrumbs for characterId ${characterId} and userId ${userId}`,
-        async () => {
-            const BreadcrumbsFromDB = await GetDb().query.breadcrumbs.findFirst({where: BreadcrumbsFor(userId, characterId)});
+        () => GetDb().transaction((tx) => {
+            const BreadcrumbsFromDB = tx.query.breadcrumbs.findFirst({where: BreadcrumbsFor(userId, characterId)}).sync();
 
             if(BreadcrumbsFromDB == undefined){
                 logger.info(`Creating new breadcrumbs entry for character ${characterId}`);
 
-                await GetDb().insert(breadcrumbs).values({
+                tx.insert(breadcrumbs).values({
                     breadcrumbs: "[]",
                     updateVersion: 0,
                     userId: userId,
                     characterId: characterId
-                });
+                }).run();
             }
 
             return {
                 breadcrumbs: JSON.parse(BreadcrumbsFromDB?.breadcrumbs ?? "[]"),
                 updateVersion: BreadcrumbsFromDB?.updateVersion ?? 0
             };
-        }
+        })
     );
 }
 
@@ -132,18 +135,18 @@ export async function SetBreadcrumbsForCharacterIdAndUserId(userId: string, char
         characterId,
         `Invalid breadcrumb data while setting breadcrumbs for characterId ${characterId} and userId ${userId}`,
         `Failed to set breadcrumbs for characterId ${characterId} and userId ${userId}`,
-        async () => {
-            const BreadcrumbsFromDB = await GetDb().query.breadcrumbs.findFirst({where: BreadcrumbsFor(userId, characterId)});
+        () => GetDb().transaction((tx) => {
+            const BreadcrumbsFromDB = tx.query.breadcrumbs.findFirst({where: BreadcrumbsFor(userId, characterId)}).sync();
 
             if(BreadcrumbsFromDB == undefined){
                 logger.info(`Creating new breadcrumbs entry for character ${characterId}`);
 
-                await GetDb().insert(breadcrumbs).values({
+                tx.insert(breadcrumbs).values({
                     breadcrumbs: JSON.stringify(breadcrumbsFromUser),
                     updateVersion: updateVersion,
                     userId: userId,
                     characterId: characterId
-                });
+                }).run();
             }
             else if(BreadcrumbsFromDB.updateVersion >= updateVersion){
                 throw new ProgressionConflictError(`Refusing stale breadcrumbs update for characterId ${characterId} and userId ${userId}: current updateVersion ${BreadcrumbsFromDB.updateVersion}, incoming updateVersion ${updateVersion}`);
@@ -151,16 +154,16 @@ export async function SetBreadcrumbsForCharacterIdAndUserId(userId: string, char
             else{
                 logger.info(`Updating breadcrumbs entry for character ${characterId} with updateVersion ${updateVersion}`);
 
-                await GetDb().update(breadcrumbs).set({
+                tx.update(breadcrumbs).set({
                     breadcrumbs: JSON.stringify(breadcrumbsFromUser),
                     updateVersion: updateVersion
-                }).where(BreadcrumbsFor(userId, characterId));
+                }).where(BreadcrumbsFor(userId, characterId)).run();
             }
 
             return {
                 breadcrumbs: breadcrumbsFromUser,
                 updateVersion: updateVersion
             };
-        }
+        })
     );
 }

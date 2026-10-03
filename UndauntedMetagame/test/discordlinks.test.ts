@@ -1,0 +1,21 @@
+import { RemoveTestDb } from './setup';
+import { after, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { GetDb } from '../src/db';
+import { DiscordAccount, LinkDiscordAccount } from '../src/controllers/discordlinks';
+const db = GetDb().$client;
+after(() => RemoveTestDb(() => db.close()));
+test('Discord linking preserves credentials and rejects reassignment on both sides', () => {
+    db.prepare('INSERT INTO users(userId,name,notes) VALUES(?,?,0)').run('UID-one','One');
+    db.prepare('INSERT INTO users(userId,name,notes) VALUES(?,?,0)').run('UID-two','Two');
+    db.prepare('INSERT INTO userapikeys(userId,keyHash) VALUES(?,?)').run('UID-one','unchanged-hash');
+    const before = db.prepare('SELECT * FROM userapikeys').all();
+    assert.equal(LinkDiscordAccount('12345678901234567','UID-one').status,'linked');
+    assert.equal(LinkDiscordAccount('12345678901234567','UID-one').status,'linked');
+    assert.equal(LinkDiscordAccount('12345678901234567','UID-two').status,'discord_already_linked');
+    assert.equal(LinkDiscordAccount('22345678901234567','UID-one').status,'account_already_linked');
+    assert.equal(LinkDiscordAccount('22345678901234567','UID-missing').status,'invalid_key');
+    assert.equal(LinkDiscordAccount('bad','UID-two').status,'invalid_key');
+    assert.deepEqual(DiscordAccount('12345678901234567'),{userId:'UID-one',username:'One'});
+    assert.deepEqual(db.prepare('SELECT * FROM userapikeys').all(),before);
+});

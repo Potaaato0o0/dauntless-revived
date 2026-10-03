@@ -1,0 +1,19 @@
+{%- comment -%}
+  Top bar, after the search box: the switch to the other language, then the outside links. The links
+  use the theme's aux-nav markup, but they live here instead of in _config.yml (aux_links) so that
+  their labels, and the portfolio link, follow the page's language.
+{%- endcomment -%}
+{%- assign hd_lang = page.lang | default: site.lang -%}
+{%- include lang_switch.html class="lang-switch" -%}
+<nav aria-label="{% if hd_lang == 'fi' %}Muut sivustot{% else %}Other sites{% endif %}" class="aux-nav">
+  <ul class="aux-nav-list">
+    <li class="aux-nav-list-item"><a href="https://github.com/SyST3MDeV/Undaunted" class="site-button" target="_blank" rel="noopener noreferrer">{% if hd_lang == "fi" %}Undaunted (alkuperäinen){% else %}Undaunted (upstream){% endif %}</a></li>
+    <li class="aux-nav-list-item"><a href="https://github.com/mixutin/dauntless-revived" class="site-button" target="_blank" rel="noopener noreferrer">{% if hd_lang == "fi" %}Lähdekoodi GitHubissa{% else %}GitHub repo{% endif %}</a></li>
+    <li class="aux-nav-list-item"><a href="https://discord.gg/ZJRprHzsgu" class="site-button" target="_blank" rel="noopener noreferrer">{% if hd_lang == "fi" %}Liity Discordiin{% else %}Join Discord{% endif %}</a></li>
+    {%- if hd_lang == "fi" %}
+    <li class="aux-nav-list-item"><a href="https://mixutin.github.io/fi/" class="site-button" target="_blank" rel="noopener noreferrer" hreflang="fi">Portfolio</a></li>
+    {%- else %}
+    <li class="aux-nav-list-item"><a href="https://mixutin.github.io/" class="site-button" target="_blank" rel="noopener noreferrer" hreflang="en">Portfolio</a></li>
+    {%- endif %}
+  </ul>
+</nav>

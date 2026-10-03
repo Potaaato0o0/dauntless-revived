@@ -1,0 +1,83 @@
+# Dependency update pull requests, kept few:
+#  - GitHub Actions: weekly, every update in one pull request (the actions stay pinned by commit).
+#  - npm: monthly for each package folder; minor and patch updates of a folder come as one pull request.
+#    Major updates are never grouped: each one (Electron's included) is its own pull request, so it can be
+#    tested on its own.
+# A release has to be at least a week old before it is proposed.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /UndauntedMetagame
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      metagame-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /UndauntedGateway
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      gateway-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /UndauntedContent
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      content-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /UndauntedDeployServer
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      deployserver-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /UndauntedLauncher
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      launcher-minor-and-patch:
+        update-types:
+          - minor
+          - patch

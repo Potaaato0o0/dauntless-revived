@@ -1,0 +1,122 @@
+// The "revived" colour scheme, selected by `color_scheme: revived` in _config.yml. It sets the theme's
+// scheme variables from the brand tokens in _sass/custom/setup.scss; what the variables do not cover
+// (button text, focus rings, the current page in the navigation and so on) is in _sass/custom/custom.scss.
+//
+// Contrast (WCAG AA, the ratios are in brand/palette.json): body text frost on ink 18.23, on navy 16.80;
+// links ice on ink 7.31, on navy 6.73, on deep 4.82; navigation children steel on navy 6.93, on deep 4.96.
+
+$color-scheme: dark;
+$body-background-color: $dr-ink;
+$body-heading-color: $dr-frost;
+$body-text-color: $dr-frost;
+$link-color: $dr-ice;
+$nav-child-link-color: $dr-steel;
+$sidebar-color: $dr-navy;
+$base-button-color: $dr-navy;
+$btn-primary-color: $dr-ice;
+$code-background-color: $dr-navy;
+$code-linenumber-color: $dr-steel;
+$feedback-color: $dr-deep;
+$table-background-color: $dr-navy;
+$search-background-color: $dr-navy;
+$search-result-preview-color: $dr-steel;
+$border-color: $dr-deep;
+
+// Syntax highlighting in the brand colours instead of the theme's red, green, purple and orange. Only the
+// four palette colours that pass AA on navy are used (frost 16.80, glow 13.36, steel 6.93, ice 6.73), told
+// apart further by bold and italic. The rules cover every token class of the theme's GitHub light and dark
+// styles, so none of the light style's colours (imported first by the theme) is left over.
+.highlight {
+  color: $dr-frost;
+  background: $dr-navy;
+
+  .hll {
+    background-color: $dr-deep;
+  }
+
+  // Plain text, names, punctuation and operator symbols.
+  .n, .nx, .na, .nb, .bp, .p, .pm, .o, .x, .esc, .g, .err {
+    color: $dr-frost;
+    font-weight: normal;
+  }
+
+  // Comments, console output and prompts, visible whitespace.
+  .c, .ch, .cm, .cpf, .c1, .go, .gp, .w {
+    color: $dr-steel;
+  }
+
+  .c, .ch, .cm, .cpf, .c1 {
+    font-style: italic;
+  }
+
+  .cp, .cs {
+    color: $dr-steel;
+    font-style: italic;
+    font-weight: bold;
+  }
+
+  // Keywords and word operators.
+  .k, .kd, .kn, .kr, .kt, .ow {
+    color: $dr-glow;
+    font-weight: bold;
+  }
+
+  // Variables, properties, keys and labels, constants, numbers, escapes.
+  .nv, .vc, .vg, .vi, .vm, .py, .nt, .nl, .no, .kc, .kp, .ld,
+  .m, .mb, .mf, .mh, .mi, .mo, .il, .se, .sr {
+    color: $dr-glow;
+    font-weight: normal;
+  }
+
+  // Strings.
+  .l, .s, .s1, .s2, .sa, .sb, .sc, .sd, .sh, .si, .ss, .sx, .dl {
+    color: $dr-ice;
+  }
+
+  // Functions, classes, namespaces, decorators, exceptions, entities.
+  .nf, .fm, .nc, .nn, .nd, .ne, .ni {
+    color: $dr-frost;
+    font-weight: bold;
+  }
+
+  // Diffs and document markup.
+  .gh, .gu {
+    color: $dr-glow;
+    font-weight: bold;
+  }
+
+  .gi {
+    color: $dr-ice;
+    background-color: transparent;
+  }
+
+  .gd, .gr, .gt {
+    color: $dr-steel;
+    background-color: transparent;
+  }
+
+  .gd {
+    text-decoration: line-through;
+  }
+
+  .ge {
+    color: $dr-frost;
+    font-style: italic;
+  }
+
+  .gs {
+    color: $dr-frost;
+    font-weight: bold;
+  }
+
+  .ges {
+    color: $dr-frost;
+    font-style: italic;
+    font-weight: bold;
+  }
+
+  .g-Underline {
+    color: $dr-frost;
+    text-decoration: underline;
+  }
+}

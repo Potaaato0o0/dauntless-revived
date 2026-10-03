@@ -1,0 +1,19 @@
+[Unit]
+Description=Dauntless Revived game deploy server
+After=network-online.target dauntless-metagame.service
+Wants=network-online.target
+Requires=dauntless-metagame.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@/UndauntedDeployServer
+ExecStart=@NODE@ --env-file=@CONFIG@/deployserver.env @ROOT@/UndauntedDeployServer/dist/server.js
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

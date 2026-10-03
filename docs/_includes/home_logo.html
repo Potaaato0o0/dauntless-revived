@@ -1,0 +1,18 @@
+{%- comment -%}
+  The full Dauntless Revived logo above the home page's heading, on the English and the Finnish home page
+  (the pages with ref "index"). _layouts/default.html renders it, so the pages' own text is unchanged.
+  Displayed 300 px wide, 240 px on phones (styles in _sass/custom/custom.scss): WebP with a PNG
+  fallback, 400 and 800 px wide files for normal and high-density screens (built by brand/build.py).
+{%- endcomment -%}
+{%- assign hl_lang = page.lang | default: site.lang -%}
+{%- if hl_lang == "fi" -%}
+  {%- assign hl_alt = "Dauntless Revived -logo: lohikäärmeen pää lumisten vuorten yllä ja sen alla teksti Dauntless Revived" -%}
+{%- else -%}
+  {%- assign hl_alt = "The Dauntless Revived logo: a dragon's head above snowy mountains, with the words Dauntless Revived below it" -%}
+{%- endif %}
+<div class="home-logo">
+  <picture>
+    <source type="image/webp" srcset="{{ '/assets/brand/logo-400.webp' | relative_url }} 400w, {{ '/assets/brand/logo-800.webp' | relative_url }} 800w" sizes="(min-width: 31.25rem) 300px, 240px">
+    <img src="{{ '/assets/brand/logo-400.png' | relative_url }}" srcset="{{ '/assets/brand/logo-400.png' | relative_url }} 400w, {{ '/assets/brand/logo-800.png' | relative_url }} 800w" sizes="(min-width: 31.25rem) 300px, 240px" width="300" height="240" alt="{{ hl_alt }}" fetchpriority="high">
+  </picture>
+</div>

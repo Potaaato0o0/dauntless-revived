@@ -1,0 +1,16 @@
+// Brand tokens: the eight colours of the Dauntless Revived palette, measured from the logo. This is the
+// only place the docs site defines them. brand/palette.json has the same values with their roles and the
+// checked contrast pairs, and `python3 brand/build.py --check` fails if the two drift apart.
+//
+// The theme imports this file before any colour scheme, so _sass/color_schemes/revived.scss (the theme's
+// scheme variables) and _sass/custom/custom.scss (everything the variables do not reach) both use these
+// names, and custom.scss also publishes them as CSS custom properties (--dr-ink and so on).
+
+$dr-ink: #01090D;   // page background
+$dr-navy: #031523;  // surfaces: sidebar, code blocks, tables, search
+$dr-deep: #093251;  // raised surfaces, borders between surfaces, hover and current-page fills
+$dr-azure: #0D669C; // dark accent: pressed fills, control borders on ink, blockquote bar
+$dr-ice: #18A7E0;   // primary accent: links, primary buttons
+$dr-glow: #78ECF9;  // highlights, hovered links, focus rings, small glows
+$dr-steel: #999FA7; // muted text: navigation children, captions, footers
+$dr-frost: #F3F4F5; // body text and headings

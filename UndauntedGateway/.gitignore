@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+tmp/
+temp/
+.cache/
+*.log
+# Certificates, keys and the allowlist state never go into the repository
+*.pem
+*.key
+allowlist-state.json

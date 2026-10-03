@@ -1,0 +1,23 @@
+{%- comment -%}
+  Resolves the page links in one FAQ answer from _data/faq_<lang>.yml.
+  Answers link to other pages by their source path, e.g. [Host a server](setup/host.md#requirements)
+  or [ohje](fi/setup/host.md), so they keep working if permalinks change.
+  Params: md = the answer's Markdown; absolute="1" gives full URLs (used for the JSON-LD in head_custom.html).
+  Output: the same Markdown with those links replaced by the pages' URLs.
+{%- endcomment -%}
+{%- assign faq_r_md = include.md -%}
+{%- for faq_r_page in site.pages -%}
+  {%- if faq_r_page.ref -%}
+    {%- assign faq_r_needle = "](" | append: faq_r_page.path -%}
+    {%- if faq_r_md contains faq_r_needle -%}
+      {%- if include.absolute == "1" -%}
+        {%- assign faq_r_url = faq_r_page.url | absolute_url -%}
+      {%- else -%}
+        {%- assign faq_r_url = faq_r_page.url | relative_url -%}
+      {%- endif -%}
+      {%- assign faq_r_with = "](" | append: faq_r_url -%}
+      {%- assign faq_r_md = faq_r_md | replace: faq_r_needle, faq_r_with -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{{- faq_r_md -}}

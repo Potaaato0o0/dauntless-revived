@@ -1,0 +1,309 @@
+// Site-specific styles, imported last by the just-the-docs theme. Colours come only from the brand tokens
+// in _sass/custom/setup.scss; the scheme variables are in _sass/color_schemes/revived.scss.
+
+// The tokens as CSS custom properties, for inline styles and anything written outside Sass.
+:root {
+  --dr-ink: #{$dr-ink};
+  --dr-navy: #{$dr-navy};
+  --dr-deep: #{$dr-deep};
+  --dr-azure: #{$dr-azure};
+  --dr-ice: #{$dr-ice};
+  --dr-glow: #{$dr-glow};
+  --dr-steel: #{$dr-steel};
+  --dr-frost: #{$dr-frost};
+}
+
+::selection {
+  color: $dr-frost; // 5.61:1 on azure
+  background-color: $dr-azure;
+}
+
+// Keyboard focus: a glow ring (13:1 or more against ink, navy and deep) wherever focus lands. The theme's
+// own offsets (-1px on navigation links, the site title and the search box) are kept.
+:focus-visible {
+  outline: 2px solid $dr-glow;
+}
+
+// Links in text. Ice alone is too close to the body text to tell them apart by colour, so the underline
+// has to show: the theme draws it in the border colour, which almost disappears on ink.
+a:not([class]) {
+  text-decoration-color: rgba($dr-ice, 0.55);
+
+  &:hover {
+    color: $dr-glow;
+    text-decoration-color: $dr-glow;
+  }
+}
+
+// Header: the emblem and the site name (_includes/title.html). The name fits on one line in the
+// sidebar's width with the usual system fonts; with a wider one (DejaVu Sans, the default on some
+// Linux desktops) it wraps to two lines instead of running past the sidebar.
+.site-title {
+  gap: $sp-2;
+  font-weight: 600;
+
+  @include mq(md) {
+    padding-right: $sp-4;
+  }
+}
+
+// On the span: the theme sets the link's own font size with !important.
+.site-name {
+  min-width: 0;
+  font-size: 1.125rem;
+  line-height: 1.15;
+}
+
+.site-emblem {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  filter: drop-shadow(0 0 0.375rem rgba($dr-ice, 0.35));
+}
+
+// The full logo above the home page's heading (_includes/home_logo.html), on a soft azure halo.
+.home-logo {
+  margin: 0 0 $sp-4;
+
+  img {
+    display: block;
+    width: 15rem;
+    max-width: 100%;
+    height: auto;
+
+    @include mq(sm) {
+      width: 18.75rem;
+    }
+  }
+
+  picture {
+    display: inline-block;
+    background: radial-gradient(closest-side, rgba($dr-azure, 0.35), rgba($dr-azure, 0));
+  }
+}
+
+// Navigation: the current page and hovered links in glow (9.56:1 on deep), with an ice bar on the
+// current page. Child links stay steel until hovered.
+.site-nav .nav-list .nav-list-item {
+  .nav-list-link:hover,
+  .nav-list-link.active,
+  > .nav-list .nav-list-item .nav-list-link:hover,
+  > .nav-list .nav-list-item .nav-list-link.active {
+    color: $dr-glow;
+  }
+
+  .nav-list-link.active {
+    box-shadow: inset 3px 0 0 $dr-ice;
+  }
+}
+
+.breadcrumb-nav-list-item::after,
+.search-label .search-icon {
+  color: $dr-steel;
+}
+
+.search-input::placeholder {
+  color: $dr-steel; // 7.52:1 on ink, 6.93:1 on navy
+  opacity: 1;
+}
+
+.search-result-highlight {
+  color: $dr-glow;
+}
+
+// Buttons. Default: ice on navy with an azure edge (3.25:1 against ink). Primary: ink on ice (7.31:1),
+// ink on glow when hovered (14.50:1), frost on azure when pressed (5.61:1); white on ice would fail AA.
+.btn {
+  color: $dr-ice;
+  background-color: $dr-navy;
+  box-shadow: inset 0 0 0 1px $dr-azure;
+
+  &:hover,
+  &:active {
+    color: $dr-glow;
+    background-color: $dr-deep;
+  }
+
+  &:focus,
+  &:focus:hover {
+    box-shadow: inset 0 0 0 1px $dr-azure;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $dr-glow;
+    outline-offset: 2px;
+  }
+}
+
+.btn-primary {
+  color: $dr-ink;
+  background-color: $dr-ice;
+  background-image: none;
+
+  &,
+  &:focus,
+  &:focus:hover {
+    box-shadow: 0 0 1rem rgba($dr-ice, 0.25);
+  }
+
+  &:hover {
+    color: $dr-ink;
+    background-color: $dr-glow;
+    background-image: none;
+  }
+
+  &:active,
+  &.selected {
+    color: $dr-frost;
+    background-color: $dr-azure;
+  }
+}
+
+// Content details the scheme variables do not reach.
+.main-content {
+  ul > li::before {
+    color: $dr-ice;
+  }
+
+  ol > li::before {
+    color: $dr-steel;
+  }
+
+  th {
+    background-color: $dr-deep; // frost 12.02:1, links 4.82:1
+  }
+}
+
+blockquote {
+  border-left-color: $dr-azure;
+}
+
+// Footers in muted text: steel is 7.52:1 on ink and 6.93:1 on navy.
+.main-content footer,
+.site-footer {
+  color: $dr-steel;
+}
+
+// Printing. On screen the text is light on dark surfaces, but paper is white and browsers leave out
+// background colours by default, so frost text would print almost invisible. Printed pages use ink
+// for all text (20.07:1 on white) and azure for links (6.18:1), with no fills or shadows, whether or
+// not the browser prints backgrounds.
+@media print {
+  *,
+  *::before,
+  *::after {
+    color: $dr-ink !important;
+    background-color: transparent !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  a,
+  a * {
+    color: $dr-azure !important;
+  }
+}
+
+// Language switch in the top bar (_includes/header_custom.html).
+.main-header .lang-switch {
+  display: flex;
+  align-items: center;
+  padding: $sp-2 $gutter-spacing-sm;
+  white-space: nowrap;
+
+  @include mq(md) {
+    padding: 0 $sp-4;
+  }
+
+  a {
+    font-weight: 500;
+  }
+}
+
+// The same link at the bottom of every page (_includes/footer_custom.html), for small screens.
+.lang-switch-footer a {
+  font-weight: 500;
+}
+
+// Mobile docs: let dense desktop content breathe instead of squeezing it into unreadable columns.
+@media (max-width: 50rem) {
+  .main-content {
+    padding-left: $gutter-spacing-sm;
+    padding-right: $gutter-spacing-sm;
+    overflow-wrap: anywhere;
+
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.45rem; }
+    pre, code { max-width: 100%; }
+    pre { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
+
+  .main-content .table-wrapper {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .main-content table {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+  }
+
+  .main-content thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .main-content tbody,
+  .main-content tr,
+  .main-content td {
+    display: block;
+    width: 100%;
+  }
+
+  .main-content tr {
+    margin: 0 0 $sp-4;
+    border: 1px solid $dr-azure;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: $dr-navy;
+  }
+
+  .main-content td {
+    box-sizing: border-box;
+    padding: $sp-3 $sp-4;
+    border: 0;
+    border-bottom: 1px solid $dr-deep;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .main-content td:first-child {
+    color: $dr-glow;
+    font-weight: 700;
+    font-size: 1.05rem;
+    background: $dr-deep;
+  }
+
+  .main-content td:nth-child(2) {
+    color: $dr-ice;
+    font-weight: 600;
+  }
+
+  .main-content td:last-child { border-bottom: 0; }
+
+  .main-content .btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-bottom: $sp-2;
+    white-space: normal;
+  }
+
+  img, video, svg { max-width: 100%; height: auto; }
+}

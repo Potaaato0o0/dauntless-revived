@@ -1,0 +1,21 @@
+{%- comment -%}
+  Link to the same page in the other language (English <-> Finnish). Pages are paired by front matter
+  `ref`; a page without a translation links to the other language's home page instead.
+  Used by header_custom.html and footer_custom.html. Param: class = CSS class for the wrapper.
+{%- endcomment -%}
+{%- assign ls_lang = page.lang | default: site.lang -%}
+{%- if ls_lang == "fi" -%}
+  {%- assign ls_target_lang = "en" -%}
+{%- else -%}
+  {%- assign ls_target_lang = "fi" -%}
+{%- endif -%}
+{%- assign ls_target = nil -%}
+{%- if page.ref -%}
+  {%- assign ls_target = site.pages | where: "ref", page.ref | where: "lang", ls_target_lang | first -%}
+{%- endif -%}
+{%- unless ls_target -%}
+  {%- assign ls_target = site.pages | where: "ref", "index" | where: "lang", ls_target_lang | first -%}
+{%- endunless -%}
+{%- if ls_target -%}
+<div class="{{ include.class }}"><a href="{{ ls_target.url | relative_url }}" hreflang="{{ ls_target_lang }}" lang="{{ ls_target_lang }}">{% if ls_target_lang == "fi" %}Suomeksi{% else %}In English{% endif %}</a></div>
+{%- endif -%}

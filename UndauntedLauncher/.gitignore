@@ -90,3 +90,10 @@ typings/
 
 # Electron-Forge
 out/
+
+# Release files collected by the Windows and Linux release scripts
+release/
+release-linux/
+
+# Unit test build output
+.test-build/

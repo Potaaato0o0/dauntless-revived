@@ -1,0 +1,142 @@
+# Frequently asked questions, English. Rendered by docs/faq.md, and turned into FAQPage structured data by
+# _includes/head_custom.html, so the visible answers and the structured data cannot drift apart.
+# tools/build-llms.js also reads this file for llms-full.txt.
+#
+# Format (keep to it, the llms builder has a small parser):
+#   - id: the heading anchor
+#     q: "the question, in double quotes"
+#     a: >-
+#       the answer in Markdown, indented four spaces, one paragraph (the lines are joined with spaces)
+# Link to other pages by their source path, e.g. [Host a server](setup/host.md#requirements);
+# _includes/faq_resolve.html turns that into the page's real URL.
+
+- id: can-you-still-play-dauntless
+  q: "Can you still play Dauntless after the shutdown?"
+  a: >-
+    Yes, against a private server. The official servers shut down on 30 May 2025, and without a backend
+    the game cannot be played at all. Dauntless Revived is a replacement backend for the genuine
+    Dauntless 1.4.4 client: if you have your own copy of that client, you can host it and play. So far
+    the game has been played by one player: on the host PC (login, the tutorial, Ramsgate, the Training
+    Dojo, hunts and crafting) and, on 22 September 2026, over the internet on a server on a rented
+    machine, from the invite to the first hunt. Playing with a second player has not been tested yet.
+    See [what works now](index.md#current-status).
+
+- id: is-there-a-dauntless-private-server
+  q: "Is there a Dauntless private server?"
+  a: >-
+    Yes. Dauntless Revived is a private server built on [Undaunted](https://github.com/SyST3MDeV/Undaunted),
+    the open-source Dauntless server by gwog and contributors. It is not a public server that anyone can
+    join: it runs for a few friends, and anyone can host their own from
+    [the source code](https://github.com/mixutin/dauntless-revived). A related project,
+    [Mystic Paradox](https://github.com/pranav158/Mystic-Paradox), ports the same approach to the 1.12.0
+    client.
+
+- id: which-version
+  q: "Which version of Dauntless does it use?"
+  a: >-
+    The genuine Dauntless 1.4.4 client from October 2020 (Unreal Engine 4). The game's own files are not
+    modified; two DLLs are placed next to the executable. Undaunted's server DLL hooks fixed addresses
+    inside that exact build, so other versions, including the final 2.1.1 client, do not work. Content
+    released after November 2020 is not in 1.4.4. [Verifying game files](findings/verification.md) shows
+    how to check that a copy is genuine.
+
+- id: do-i-need-an-epic-account
+  q: "Do I need an Epic Games account?"
+  a: >-
+    No. The 1.4.4 client predates the Epic Online Services login. Each player has an account on the
+    server and logs in with a personal account key. See [Join as a friend](setup/friends.md).
+
+- id: can-i-join-your-server
+  q: "Can I join your server?"
+  a: >-
+    No, sorry. It is a small private group of friends, not a public service. Our server runs on a rented
+    machine, but only people the owner invites can make an account, and they join with the friend
+    launcher and an invite. You can run the same thing for your own group; see
+    [Host a server](setup/host.md) or, for a rented machine, the [Windows server kit](setup/windows-server.md).
+
+- id: how-do-i-host-my-own
+  q: "How do I host my own Dauntless server?"
+  a: >-
+    You need a Windows PC, your own copy of the Dauntless 1.4.4 client, Node.js and the fork's source
+    code. [Host a server](setup/host.md) walks through it step by step: verify the build, place the two
+    DLLs, then start the metagame (the backend) and the deploy server (which starts the game servers).
+    [Run it for a group](setup/admin.md) covers letting friends in. For an always-on server on a rented
+    Windows Server 2019 machine, the [Windows server kit](setup/windows-server.md) installs everything with
+    one command from your PC.
+
+- id: where-do-i-get-the-game-files
+  q: "Where do I get the game files?"
+  a: >-
+    Not from here. This site and the repository contain no game files, and we do not link to downloads of
+    the game. Every player needs their own copy of the 1.4.4 client.
+    [Verifying game files](findings/verification.md) explains how to check that a copy is genuine and
+    unmodified.
+
+- id: is-it-affiliated
+  q: "Is Dauntless Revived affiliated with Phoenix Labs or Epic Games?"
+  a: >-
+    No. It is an unofficial, non-commercial fan project. It is not affiliated with, endorsed by or
+    supported by Phoenix Labs or Epic Games, and "Dauntless" is a trademark of its owners. Nothing is
+    sold, and there is no real-money store.
+
+- id: is-it-legal
+  q: "Is it legal?"
+  a: >-
+    We cannot give legal advice. What we can say is what the project does: it does not include or link to
+    game files in this site or the repository, it does not modify the game's files on disk, it is
+    non-commercial, and its own code is licensed AGPL-3.0. It exists for preservation and interoperability, so that people who already own the game
+    can keep playing it. [Credits and license](legal.md) has the details, including what the AGPL asks of
+    anyone who hosts a modified server.
+
+- id: does-progress-save
+  q: "Does my progress save?"
+  a: >-
+    Mostly. Items, materials, Rams, crafted gear, quests and story progress are saved in a database, survive
+    restarts and are backed up every hour. Slayer level, weapon and behemoth mastery and the Hunt Pass
+    (with the Elite pass for everyone) are saved too: real progression is on by default and passed an
+    in-game test on a throwaway account, and on our rented server on 22 September 2026 Slayer level,
+    weapon mastery and behemoth mastery all went up in the game. Bounties and daily limits are stored but not fully tried in the
+    game yet, and escalation is not saved. The rest of "everything you earn is saved" is milestone M2 on
+    the [roadmap](roadmap.md).
+
+- id: what-is-undaunted
+  q: "What is Undaunted, and how is Dauntless Revived different?"
+  a: >-
+    [Undaunted](https://github.com/SyST3MDeV/Undaunted), by gwog (Gregory Morford) and contributors, is
+    the open-source project that made this possible. The server-mode DLL that turns a copy of the 1.4.4
+    client into a game server, the deploy server, the metagame backend and the launcher are all theirs.
+    Dauntless Revived is a modified fork of it. We started with practical changes (safer network
+    defaults, clearer errors and a request log) and have since added saved progression, safer saves,
+    usernames and invite codes, parties, a friends list and guilds on the server side, a friend launcher built on
+    Undaunted's, a gateway for hosting on a public address, a Windows server kit, documentation in English
+    and Finnish, and a [roadmap](roadmap.md) towards playing together with everything saved.
+
+- id: can-you-play-with-friends
+  q: "Can you play together with friends?"
+  a: >-
+    Hunting together, yes. On 22 September 2026 two players saw each other in Ramsgate and hunted
+    together over the internet on our rented server, where friends join with the launcher and an invite;
+    they queued for the same hunt within a few seconds of each other. Parties, the friends list and guilds
+    are built on the server side, but in that test a party invite and a friend request did not show in
+    game. The causes are found and fixed, and the fixes pass tests that replay the game's own requests;
+    the next two-player test will show whether they work in game. Upstream Undaunted reports hunts with
+    up to 4 players working on the same client; we have tried two. The [roadmap](roadmap.md) tracks
+    this as milestone M1, and [How multiplayer works](findings/multiplayer.md) explains how a client-only
+    build can host games at all.
+
+- id: linux-and-steam-deck
+  q: "Does it work on Linux or the Steam Deck?"
+  a: >-
+    Linux client support is experimental but now tested on Ubuntu with Proton. Launcher 0.1.13 fixes a
+    Wine/Proton client-initialization deadlock that could leave Discord showing Dauntless while no game
+    window appeared, and the launcher handles the native dxgi override and GNOME/Wayland XWayland
+    authorization automatically. Steam Deck has not been tested yet. Hosting the actual Dauntless game
+    servers under Wine/Proton is a separate path from the Linux player launcher; the Node.js backend
+    already runs on Linux, while the game-server Wine path is still being validated.
+
+- id: can-i-help
+  q: "Can I help?"
+  a: >-
+    Yes. The source code, the [roadmap](roadmap.md) and the [findings](findings/index.md) are public, so
+    you can read, test and fork everything. If you spot a mistake on this site, or you know how part of
+    the original backend behaved, open an issue on [GitHub](https://github.com/mixutin/dauntless-revived).

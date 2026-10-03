@@ -28,18 +28,47 @@ characterRouter.put("/character", HasUndauntedMetagameAuth, async (req: any, res
     res.json(NewCharacter);
 })
 
+// The client sends a JSON number; a numeric string compared and stored the same way before, so keep accepting it
+function ParseUpdateVersion(Value: unknown){
+    const Version = typeof Value === "string" && /^\d+$/.test(Value) ? Number(Value) : Value;
+
+    return Number.isSafeInteger(Version) && (Version as number) >= 0 ? Version as number : undefined;
+}
+
 characterRouter.post("/character", HasUndauntedMetagameAuth, async (req: any, res) => {
     const CharacterIdToUpdate = req.body.characterId;
     const UserId = req.AuthData.userId;
     const DataToUpdateWith = req.body.data;
-    const UpdateVersion = req.body.updateVersion;
+    const UpdateVersion = ParseUpdateVersion(req.body.updateVersion);
 
-    logger.info(`Updating characterId ${CharacterIdToUpdate} for userId ${UserId} with updateVersion ${UpdateVersion}`);
+    logger.info(`Updating characterId ${CharacterIdToUpdate} for userId ${UserId} with updateVersion ${req.body.updateVersion}`);
 
-    const DidSucceed = await UpdateCharacterForUid(CharacterIdToUpdate, UserId, DataToUpdateWith, UpdateVersion);
+    if(UpdateVersion == undefined){
+        logger.warn(`Refusing update of characterId ${CharacterIdToUpdate} for userId ${UserId}: updateVersion ${JSON.stringify(req.body.updateVersion)} is not a version number`);
 
-    if(!DidSucceed){
-        logger.warn(`Failed to update characterId ${CharacterIdToUpdate} for userId ${UserId} due to conflict`);
+        res.status(400);
+        res.send();
+        return;
+    }
+
+    const Result = UpdateCharacterForUid(CharacterIdToUpdate, UserId, DataToUpdateWith, UpdateVersion, req.AuthData.IsGameserver ? "save:gameserver" : "save:client");
+
+    if(!Result.success){
+        if(Result.error === "not_found"){
+            logger.warn(`Failed to update characterId ${CharacterIdToUpdate} for userId ${UserId}: no such character for this user`);
+
+            res.status(404);
+            res.send();
+            return;
+        }
+
+        if(Result.error === "invalid_data"){
+            res.status(400);
+            res.send();
+            return;
+        }
+
+        logger.warn(`Failed to update characterId ${CharacterIdToUpdate} for userId ${UserId} due to conflict (stored updateVersion ${Result.storedVersion}, incoming ${UpdateVersion})`);
 
         res.status(409);
         res.send();

@@ -20,6 +20,7 @@ export type UserInfo = {
 
 type PlayerActivity = { // TODO: Track more stuff from the game's native telemetry here
     Map: string;
+    State?: string; // the heartbeat's "state" (menu, city, island...) when it sends one
     LastUpdatedTime: number
 }
 
@@ -37,6 +38,19 @@ export type PlayerData = {
 
 let PlayerActivityMap: Map<string, PlayerActivity> = new Map<string, PlayerActivity>();
 let PlayerLocationMap: Map<string, PlayerLocation> = new Map<string, PlayerLocation>();
+let LastPlayerTrackingPrune = 0;
+// Heartbeats are online for 90 seconds. Keep a ten-minute reconnection grace period,
+// then release inactive accounts instead of retaining every player until restart.
+export function PrunePlayerTracking(Now = Date.now()) {
+    if (Now >= LastPlayerTrackingPrune && Now - LastPlayerTrackingPrune < 60000) return;
+    LastPlayerTrackingPrune = Now;
+    for (const [Uid, Activity] of PlayerActivityMap) {
+        if (Now - Activity.LastUpdatedTime > 600000) PlayerActivityMap.delete(Uid);
+    }
+    for (const [Uid, Location] of PlayerLocationMap) {
+        if (!PlayerActivityMap.has(Uid) && Now - Location.EnteredTime > 600000) PlayerLocationMap.delete(Uid);
+    }
+}
 
 export function IsRegistrationMode(Value: unknown): Value is RegistrationMode {
     return typeof Value === "string" && VALID_REGISTRATION_MODES.includes(Value as RegistrationMode);
@@ -141,14 +155,17 @@ export async function ValidateAndConsumeInviteCode(InviteCode: unknown){
     return UsableInviteCode.length === 1;
 }
 
-export async function UpdatePlayerActivity(UserId: string, Map: string){
+export async function UpdatePlayerActivity(UserId: string, Map: string, State?: unknown){
+    PrunePlayerTracking();
     PlayerActivityMap.set(UserId, {
         Map: Map,
+        State: typeof State === "string" ? State : undefined,
         LastUpdatedTime: Date.now()
     });
 }
 
 export async function UpdatePlayerLocation(UserId: string, HuntId: string){
+    PrunePlayerTracking();
     PlayerLocationMap.set(UserId, {
         HuntId: HuntId,
         EnteredTime: Date.now()
@@ -156,6 +173,7 @@ export async function UpdatePlayerLocation(UserId: string, HuntId: string){
 }
 
 export async function GetRecentPlayerData(){
+    PrunePlayerTracking();
     let PlayerDataToReturn: PlayerData[] = [];
 
     PlayerActivityMap.forEach((value, key, map) => {
@@ -172,6 +190,22 @@ export async function GetRecentPlayerData(){
     });
 
     return PlayerDataToReturn;
+}
+
+// Heartbeats of the last 90 s (the window GetRecentPlayerData uses), for ServerStatus.
+// Only string account ids: a heartbeat that carried no player token has none.
+export function GetOnlinePlayerActivity(){
+    PrunePlayerTracking();
+    const Now = Date.now();
+    const Online: { UserId: string, Map: unknown, State: string | undefined, LastUpdatedTime: number }[] = [];
+
+    PlayerActivityMap.forEach((Activity, UserId) => {
+        if(typeof UserId === "string" && Now - Activity.LastUpdatedTime <= 90 * 1000){
+            Online.push({ UserId: UserId, Map: Activity.Map, State: Activity.State, LastUpdatedTime: Activity.LastUpdatedTime });
+        }
+    });
+
+    return Online;
 }
 
 export async function GetUserInfoForApiKey(UserApiKey: string): Promise<UserInfo | undefined>{

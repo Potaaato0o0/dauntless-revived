@@ -1,0 +1,9 @@
+{
+  "name": "dauntless-revived-discord-keys",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node --env-file=.env bot.mjs", "test": "node --test *.test.mjs" },
+  "engines": { "node": ">=22.12" },
+  "dependencies": { "discord.js": "14.27.0" }
+}

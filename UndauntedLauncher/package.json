@@ -1,49 +1,78 @@
 {
-  "name": "undauntedlauncher",
-  "productName": "Undaunted Launcher",
-  "version": "0.0.5",
-  "description": "A Launcher for the Undaunted Project",
+  "name": "dauntless-revived-launcher",
+  "productName": "Dauntless Revived Launcher",
+  "version": "0.1.18",
+  "description": "Cross-platform launcher for Dauntless Revived: join community servers, download and verify the pinned Dauntless 1.4.4 client, and play on Windows or Linux via Proton/Wine.",
   "main": ".vite/build/main.js",
   "private": true,
+  "homepage": "https://github.com/mixutin/dauntless-revived",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mixutin/dauntless-revived.git",
+    "directory": "UndauntedLauncher"
+  },
+  "bugs": {
+    "url": "https://github.com/mixutin/dauntless-revived/issues"
+  },
   "scripts": {
     "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "package": "electron-forge package --platform win32",
+    "make": "electron-forge make --platform win32",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/run-tests.mjs",
+    "icon": "node scripts/make-icon.mjs",
+    "package:linux": "electron-forge package --platform linux --arch x64",
+    "make:linux": "electron-forge make --platform linux --arch x64",
+    "collect:linux": "node scripts/collect-linux-release.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "dauntless",
+    "launcher",
+    "private-server"
+  ],
   "author": {
-    "name": "Gregory Morford",
-    "email": "realsystemdev@gmail.com"
+    "name": "mixutin",
+    "url": "https://github.com/mixutin"
   },
+  "contributors": [
+    {
+      "name": "Gregory Morford (gwog), author of the upstream Undaunted launcher",
+      "email": "realsystemdev@gmail.com",
+      "url": "https://github.com/SyST3MDeV/Undaunted"
+    }
+  ],
   "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20.19"
+  },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-deb": "^7.11.2",
     "@electron-forge/maker-rpm": "^7.11.2",
     "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
+    "@reforged/maker-appimage": "^5.3.1",
     "@types/electron-squirrel-startup": "^1.0.2",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "electron": "43.0.0",
-    "eslint": "^8.57.1",
-    "eslint-plugin-import": "^2.32.0",
-    "typescript": "~4.5.4",
-    "vite": "^8.1.3"
+    "@types/node": "^24.0.0",
+    "@types/node-forge": "^1.3.14",
+    "electron": "44.4.3",
+    "node-forge": "^1.4.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.0"
   },
   "dependencies": {
-    "@tailwindcss/cli": "^4.3.2",
-    "@tailwindcss/vite": "^4.3.2",
-    "@types/yauzl": "^3.4.0",
     "electron-squirrel-startup": "^1.0.1",
-    "flowbite": "^4.0.2",
-    "tailwindcss": "^4.3.2",
-    "yauzl": "^3.4.0"
+    "update-electron-app": "^3.3.0"
+  },
+  "overrides": {
+    "extract-zip": "npm:@electron-internal/extract-zip@^1.0.1",
+    "tar": "^7.5.22",
+    "tmp": "^0.2.7"
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.4": true
   }
 }
