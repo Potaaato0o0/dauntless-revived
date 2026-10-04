@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-04T05:29:35.0548303Z",
+      "title": "Hunt capacity, private queues and chat updates",
+      "body": "Both hosts now enforce hunt limits so concurrent requests cannot overload a server: five temporary hunts on the primary and three on the worker. The latest upstream listener-readiness fixes are deployed on both hosts. Pangar, Blaze Patrol and Shock Escalation passed startup checks; complete in-game runs still need confirmation.\n\nPrivate solo hunts now bypass public queues, and players in the same world receive a shared chat-session ID. Existing parties remain together. The key bot sends one invitation per user and prevents duplicate bot processes. Existing launcher keys and saved progression remain unchanged."
+    },
+    {
       "date": "2026-10-03T23:45:20.389447Z",
       "title": "30 free cosmetics and matchmaking update",
       "body": "The shop now contains 30 free cosmetic offers, with no bounty-token bundles. Purchases made from the earlier larger free catalog have been revoked using purchase records. Pre-owned items, separately earned items, character progress and escalation progress were preserved. Items bought from the new 30-item shop remain yours.\n\nThe latest merged matchmaking update is live on both servers. It handles concurrent groups and repeated joins without allocating duplicate hunts, keeps status requests responsive, and confirms native listening readiness. Identical character-save retries are now accepted without overwriting newer progress. Some native hunt crashes remain under investigation."
