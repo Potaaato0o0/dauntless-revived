@@ -144,6 +144,21 @@ const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
 const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
 const LADY_LUCK_CHAMPION_TAG = "store_trials_tab_champion";
 
+// The retained source is a 2025 live-service capture, so explicitly remove offers that can be
+// dated after the 1.4.4 client instead of pretending the whole later catalogue is historical.
+// The two tonic packs were added in 1.6.0 (April 2021). The five category-targeted Rare Cell
+// Cores arrived in the 2024 Lucky Break refresh. Keep uncertain older-looking offers until they
+// can be dated from stronger evidence rather than guessing.
+const LADY_LUCK_POST_144_IDS = new Set([
+    "ladyluck_bundle_consumables_00",
+    "ladyluck_bundle_consumables_01",
+    "trials_cell_core_gold_defence",
+    "trials_cell_core_gold_power",
+    "trials_cell_core_gold_technique",
+    "trials_cell_core_gold_mobility",
+    "trials_cell_core_gold_utility"
+]);
+
 const Catalog: Record<string, unknown> = {
     ...(catalog as unknown as Record<string, unknown>),
     ladyluckstore: LadyLuck.offers,
@@ -239,7 +254,7 @@ function IsListed(Offer: StoreOffer){
     const LadyLuckOffer = LADY_LUCK_IDS.has(Offer.id);
     const MiddlemanOffer = MIDDLEMAN_VENDOR_IDS.has(Offer.id) || MIDDLEMAN_OFFER_IDS.has(Offer.id);
 
-    if(LadyLuckOffer && !TrialsStore()) return false;
+    if(LadyLuckOffer && (!TrialsStore() || LADY_LUCK_POST_144_IDS.has(Offer.id))) return false;
     if(MiddlemanOffer && !MiddlemanStore()) return false;
     if(!LadyLuckOffer && !MiddlemanOffer && StoreMode() !== "free") return false;
     if (process.env.STORE_CATALOG_PROFILE === "curated30" && Offer.tags.includes("webstore") && !curated30.includes(Offer.id)) return false;
@@ -257,7 +272,7 @@ export function IsStoreTagEnabled(Tag: string){
 }
 
 export function IsStoreSkuEnabled(SkuId: string){
-    if(LADY_LUCK_IDS.has(SkuId)) return TrialsStore();
+    if(LADY_LUCK_IDS.has(SkuId)) return TrialsStore() && !LADY_LUCK_POST_144_IDS.has(SkuId);
     if(MIDDLEMAN_VENDOR_IDS.has(SkuId) || MIDDLEMAN_OFFER_IDS.has(SkuId)) return MiddlemanStore();
     return StoreMode() === "free";
 }

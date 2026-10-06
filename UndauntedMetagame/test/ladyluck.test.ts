@@ -52,7 +52,7 @@ describe("Lady Luck Trials store", () => {
         const A = await MakePlayer();
         const Offers = ListStoreOffers(A.UserId, "ladyluckstore");
 
-        assert.equal(Offers.length, 29);
+        assert.equal(Offers.length, 22);
         assert.ok(Offers.every((Offer) => !Object.prototype.hasOwnProperty.call(Offer, "prices")));
         assert.ok(Offers.every((Offer) => Number.isInteger(Offer.steelMarksPrice) !== Number.isInteger(Offer.gildedMarksPrice)));
         assert.equal(GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_normal").gildedMarksPrice, 500);
@@ -61,7 +61,7 @@ describe("Lady Luck Trials store", () => {
         assert.throws(() => CreateStorePurchase(A.UserId, "marksgilded", "ladyluck_weapon_strikers_prestige"), {Status: 404});
 
         GetDb().transaction((tx) => GrantEntitlementInTx(tx, A.UserId, TRIALS_CHAMPION_ENTITLEMENT, 0, "test"));
-        assert.equal(ListStoreOffers(A.UserId, "ladyluckstore").length, 43);
+        assert.equal(ListStoreOffers(A.UserId, "ladyluckstore").length, 36);
         assert.equal(GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_prestige").gildedMarksPrice, 1000);
     });
 
@@ -89,17 +89,28 @@ describe("Lady Luck Trials store", () => {
         assert.throws(() => CreateStorePurchase(A.UserId, "marksgilded", "ladyluck_weapon_strikers_normal"), {Status: 409});
     });
 
-    it("keeps unlimited core offers repeatable and charges each purchase atomically", async () => {
+    it("keeps the 1.4.4-era uncommon core repeatable and excludes proven later store additions", async () => {
         const A = await MakePlayer();
-        Credit(A.CharacterId, "CURRENCY_MARKS_GILDED", 300);
+        Credit(A.CharacterId, "CURRENCY_MARKS_STEEL", 300);
 
-        Buy(A.UserId, "marksgilded", "trials_cell_core_gold_power");
-        Buy(A.UserId, "gildedmarks", "trials_cell_core_gold_power");
+        Buy(A.UserId, "markssteel", "ladyluck_core_silver_slayer");
+        Buy(A.UserId, "CURRENCY_MARKS_STEEL", "ladyluck_core_silver_slayer");
 
-        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_GILDED"), 0);
-        assert.equal(StackQuantity(A.CharacterId, "CONTAINER_CORE_GOLD_POWER_CELLCORE"), 2);
-        assert.equal(GetStoreOffer(A.UserId, "trials_cell_core_gold_power").remaining, 1);
-        assert.throws(() => CreateStorePurchase(A.UserId, "marksgilded", "trials_cell_core_gold_power"), {Status: 409});
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 0);
+        assert.equal(StackQuantity(A.CharacterId, "CONTAINER_CORE_SILVER_CELLCORE"), 2);
+        assert.equal(GetStoreOffer(A.UserId, "ladyluck_core_silver_slayer").remaining, 1);
+
+        for(const Sku of [
+            "ladyluck_bundle_consumables_00",
+            "ladyluck_bundle_consumables_01",
+            "trials_cell_core_gold_defence",
+            "trials_cell_core_gold_power",
+            "trials_cell_core_gold_technique",
+            "trials_cell_core_gold_mobility",
+            "trials_cell_core_gold_utility"
+        ]){
+            assert.throws(() => GetStoreOffer(A.UserId, Sku), {Status: 404});
+        }
     });
 
     it("charges Steel Marks for one-time gameplay rewards", async () => {
@@ -118,7 +129,7 @@ describe("Lady Luck Trials store", () => {
 
         const Listed = await Call("GET", "/product/skus/public?requiredTags=ladyluckstore", {as: A.UserId});
         assert.equal(Listed.status, 200);
-        assert.equal(Listed.json.length, 29);
+        assert.equal(Listed.json.length, 22);
 
         const Single = await Call("GET", "/product/sku/ladyluck_cb_passive_trials_02", {as: A.UserId});
         assert.equal(Single.status, 200);
