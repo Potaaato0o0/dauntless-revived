@@ -287,6 +287,17 @@ All **fork only**, and read on every request. How the store works is on
 |:-----|:--------|:-------|:-------------|:-------|
 | `STORE` | `off` | `off` or `free`, any case; anything else is a warning and `off` | `off`: the store screen gets the old 400 and the purchase routes 404, as before. `free`: the catalogue of free offers in `vendor/store_catalog.json`, the purchase token and the confirm; items go to the account's active character. Before turning it on for real players, count the characters per account (the purchase goes to the character saved last). | Nobody by default |
 | `STORE_REPEATABLE_TOKENS` | off | on/off | Only with `free`. On: the bundle of 20 premium bounty tokens (`bundle_currency_bounty_small`) is listed and can be bought any number of times, which means unlimited free premium bounty drafts. Off: it is not listed and answers 404, and a token issued while it was on is refused (409). | Nobody by default |
+| `TRIALS_STORE` | off | on/off | Lady Luck only, independent of `STORE`. On: the shared store routes list and sell the Trials catalogue for Steel/Gilded Marks and enforce Champion access. Purchase mechanics are implemented and tested; the exact 1.4.4 historical offer set is still being reconstructed. | Nobody by default |
+| `MIDDLEMAN_STORE` | off | on/off | Middleman only, independent of `STORE`. On: the shared store routes list and sell the two permanent exchange-slot unlocks and Aetherdust cell offers. The current cell shelf is provisional pending recovery of the frozen 1.4.4 selection. | Nobody by default |
+
+### Trials compatibility {#metagame-trials}
+
+All **fork only** and read on every request.
+
+| Name | Default | Values | What it does | Set by |
+|:-----|:--------|:-------|:-------------|:-------|
+| `TRIALS_LEADERBOARDS` | off | on/off | Enables the restored five Trials leaderboard routes and game-server result submissions. Weekly Marks, profiles, archived weeks and placement rewards use the same stored Trials data. | Nobody by default |
+| `TRIALS_SCHEDULE` | off | on/off | Experimental: `/game_tuning/seasonal_event_schedule` advertises the current Normal/Dauntless Trial window, the current cooked hunt ids, and the captured `event_ladyluck_repeatable` scheduler key. It is an A/B test for replacing the DLL's Arena force-unlock, not yet proven by a real 1.4.4 client. | Nobody by default |
 
 ### Saves and inventory {#metagame-saves}
 

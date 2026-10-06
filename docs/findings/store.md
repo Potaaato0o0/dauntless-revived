@@ -24,10 +24,18 @@ the metagame now answers it with. The original store sold cosmetics for Platinum
 money; that store is gone for good. Ours is **free**: every offer costs nothing, and a purchase only
 unlocks the cosmetic.
 
-**Status (23 September 2026): built and tested without the game, off by default (`STORE=off`).**
-Two things are open before it goes on: the owner's decision whether the store stays free or gets
-prices in in-game currency (roadmap 3.7), and a store test in game on our server. With `STORE=off`
-the store screen gets the same error as before.
+**Status (6 October 2026): the shared purchase service is built and tested without the game.**
+The ordinary cosmetic storefront stays off by default (`STORE=off`). Lady Luck and the Middleman use
+the same token/confirm protocol but have independent, off-by-default switches: `TRIALS_STORE` and
+`MIDDLEMAN_STORE`. This lets the gameplay vendors be exercised without enabling the unrelated
+Platinum storefront.
+
+The mechanics are further along than the historical catalogues. Lady Luck's Marks spending, ownership,
+Champion gating and retry-safe grants are implemented, but its current vendor file was transformed from
+a later live-service capture and is **not yet claimed to be the exact 1.4.4 stock**. The Middleman's
+fusion slots, Aetherdust spending and permanent slot unlocks are implemented; its cell-offer pool is
+also provisional while the exact frozen October 2020 selection is reconstructed. All three remain off
+until a real 1.4.4 client pass confirms the request and presentation flow.
 
 The catalogue, the purchase-token flow, the tab layout and the list of how each item is granted come
 from **Harmonic's** Dauntless 1.4.4 fork
@@ -189,7 +197,10 @@ alone gets 403. Purchases can be traced (`inventorylog.caller = 'store'`, `entit
 | Harmonic's `season09b_10_ranks` offer (ten Hunt Pass ranks) | It granted `CURRENCY_PRESTIGE`, which the fork's own store code could not sell (no grant kind: 409). A real rank skip is a progression grant through the rank rules, not an item. |
 | Prices | Every offer is free until the owner decides otherwise (roadmap 3.7). The code refuses any offer whose `platinumPrice` is not 0. |
 | The bounty-token bundle, by default | `bundle_currency_bounty_small` gives 20 `TOKEN_BOUNTY_DRAFT_PREMIUM`, the premium bounty token that lasts into the next season, and may be bought any number of times: unlimited free premium bounty drafts. It is listed only with `STORE_REPEATABLE_TOKENS=1`, an owner decision. A token issued while it was on is refused (409) after it is switched off. |
-| The Trials, event and prestige stores, the cell-dust exchange, loadout-slot purchases | The same service ran them; nothing is built for them yet (roadmap 3.7, 3.9). |
+| Seasonal-event stores and the Hunt Pass prestige store | They used the same service, but are not restored yet (roadmap 3.9). |
+| Lady Luck's exact 1.4.4 catalogue | The priced Marks purchase path is built. The current vendor file is a later captured catalogue reshaped for 1.4.4; the October 2020 Steel/Gilded inventory is still being reconstructed before it is called historically exact. |
+| Middleman's exact 1.4.4 cell shelf | Fusion persistence, Aetherdust purchases and slot 2/3 unlocks are built. The current generated three-cell rotation is provisional; 1.4.4-era evidence says the shelf was frozen rather than rotating, and the exact catalogue ids must be recovered before replacing it. |
+| Loadout-slot store purchases | The progression/loadout unlock routes exist, but a store SKU for buying loadout slots has not been restored. |
 
 ## Switches {#switches}
 
@@ -197,6 +208,8 @@ alone gets 403. Purchases can be traced (`inventorylog.caller = 'store'`, `entit
 |:--------|:--------|:-------------|
 | `STORE` | `off` | `off`: the store screen gets the old 400 (`{"code": "400", "message": "The store is not available on Dauntless Revived yet."}`) and the three purchase routes the 404 they always got. `free`: the catalogue above, the token and the confirm. |
 | `STORE_REPEATABLE_TOKENS` | off | `1` lists and sells the bounty-token bundle, unlimited. |
+| `TRIALS_STORE` | off | Serves Lady Luck's Steel/Gilded Marks offers through the same four store routes even when `STORE=off`. Champion-tagged offers stay hidden until the account earns the permanent Trials Champion entitlement. The purchase mechanics are tested; the exact 1.4.4 offer list is still being reconstructed. |
+| `MIDDLEMAN_STORE` | off | Serves the Middleman's slot-2/slot-3 unlock offers and Aetherdust cell offers even when `STORE=off`. The transaction mechanics are tested; the cell shelf is still provisional for 1.4.4. |
 
 The full descriptions are on [Configuration]({{ config_page.url | relative_url }}#metagame-store), the
 routes on [HTTP API]({{ api_page.url | relative_url }}#store), the table on
@@ -224,7 +237,10 @@ Before `STORE=free` becomes the default, with a throwaway account on the rented 
 | Instanced items bought in the store show and can be equipped | not seen yet |
 | The active character is the one on screen | S |
 | The item shows at once, without a relog | not seen yet |
-| Free or priced | the owner's decision (3.7) |
+| Free or priced ordinary storefront | the owner's decision (3.7) |
+| Lady Luck offer set matches October 2020 | reconstruction in progress |
+| Middleman shelf matches the frozen 1.4.4 selection | reconstruction in progress |
+| Lady Luck and Middleman request/tag/currency sequence in the real client | not seen yet |
 
 The history of the store item is on the [roadmap]({{ roadmap_page.url | relative_url }}) (3.7), and
 the [backend contract]({{ contract_page.url | relative_url }}) describes the other services the

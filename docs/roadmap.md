@@ -161,7 +161,7 @@ What the 2026-09-21 session sent to the server (`metagame.log`, 09:38–10:50 UT
 | Mailbox | Always empty | |
 | Guild | No | *Update 2026-09-22: built (3.11): guilds, members and invites are stored in SQLite and survive a restart. Running on the rented server since 22 September; not tried in game yet.* |
 | Party, friends list | No, being built elsewhere | *Update 2026-09-22: built on the server side (1.9). Friendships and blocks are saved in SQLite; parties and invites live in memory, so a metagame restart leaves everyone in a party of one. Tested with simulated players only. The fixes for what blocked them in the two-player test are built and running on the rented server (22 September), not yet tried in game.* |
-| Trials times, leaderboards, event stats | No | |
+| Trials times, leaderboards, event stats | Backend complete; UI test pending | Trials rotation, five leaderboard routes, profiles, weekly Marks and placement rewards are built behind `TRIALS_LEADERBOARDS`. The server-side schedule experiment is behind `TRIALS_SCHEDULE`; the DLL force-unlock is still required until the client A/B test proves otherwise. General `/eventstats` remains a stub. |
 | Backups | Yes, on this PC | *Update: hourly, plus around every start and stop, with a restore test passed (0.1). There are no copies off this PC yet (0.2). The rented server takes its own hourly backups with the kit's task, which is running there.* |
 
 ### What to tell friends right now
@@ -656,19 +656,19 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
   - **What:**
     - An item catalogue served at `GET /product/skus/public` (400 before, 15 calls) and `GET /product/sku/:id`. *Built.*
     - A purchase flow that grants the items in one inventory transaction. *Built for free offers; prices are the decision below.*
-    - The same service also runs the Trials store, the event stores, the Hunt Pass prestige store, the Middleman cell-dust exchange and loadout-slot purchases. *Not built.*
+    - The same service also runs the Trials store, the event stores, the Hunt Pass prestige store, the Middleman cell-dust exchange and loadout-slot purchases. *Lady Luck and Middleman are now built behind `TRIALS_STORE` and `MIDDLEMAN_STORE`; event/prestige and loadout-slot store purchases are still open. Lady Luck's exact October 2020 catalogue and the Middleman's frozen 1.4.4 cell shelf are reconstruction work, so both switches stay off by default.*
   - **Decision:** items free, or priced in in-game currency. If Platinum is used, hand it out through the mailbox. *Still open; it gates `STORE=free`.*
   - **The live test that switches it on:** after the decision, count the accounts with more than one character, set `STORE=free`, open every tab (each shows its own kind of item: EMOTES shows emotes), buy one stacked armour piece, one instanced weapon skin, one lantern and one sheen (and the token bundle if allowed), log in again (everything visible and equippable), and finish a hunt with no inventory 409.
   - **Needs:** 2.2, 2.14, 2.17.
   - **Done when:** buying one item takes the right currency once and adds the item once.
 
-- [ ] **3.8 Trials** (rotation S–M, leaderboards M, schedule XL)
+- [ ] **3.8 Trials** (rotation S–M, leaderboards M, schedule XL) — ***Backend built 2026-10-06; live client verification remains.** The exact 88-row Hard/Elite cooked rotation now advances deterministically each Thursday, the five 1.4.4 leaderboard routes persist solo/group results and profiles, weekly Steel/Gilded tiers pay once, archived weeks keep their own dates/rows, and completed Dauntless weeks award Trials Champion (top 100) / The Dauntless (top 5). Lady Luck purchases can consume those Marks. `TRIALS_LEADERBOARDS` keeps the board off until the client shapes are exercised. An experimental `TRIALS_SCHEDULE` now serves the current Trial window plus the captured `event_ladyluck_repeatable` key; the DLL Arena force-unlock remains until an A/B client test proves the schedule is enough.**
   - **What:**
-    - (a) Everyone faces the same trial each week: cycle through the 67 cooked rows from a fixed start date instead of a random pick.
-    - (b) Leaderboard tables and the 5 routes.
-    - (c) Research making the client's expired schedule (it ends 2021-03-25) agree without the DLL force-unlock.
-  - **Needs:** 1.9 (group leaderboards) and 4.4 (for c).
-  - **Done when:** everyone sees the same trial for the week, and completion times show up on the board.
+    - (a) Everyone faces the same trial each week. *Built, using all 88 cooked rows.*
+    - (b) Leaderboard tables, profiles, rewards and the 5 routes. *Built and regression-tested.*
+    - (c) Make the client's expired schedule agree without the DLL force-unlock. *Experimental server schedule built; real-client A/B test still open.*
+  - **Needs:** 4.4/live 1.4.4 client verification for (c).
+  - **Done when:** with the DLL Arena bypass removed, the client still exposes and queues the scheduled Trial, then the result, Marks and board survive a relog.
 
 - [ ] **3.9 Seasonal events** (L, plus M for each event)
   - **What:**

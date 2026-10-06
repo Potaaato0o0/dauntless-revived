@@ -266,6 +266,10 @@ it, and everyone else gets upstream's fixed max ranks
 | `ESCALATION_MODE` | unset: `stub` | `real` stores Escalation for real-progression accounts: `GET /escalation/...` reads the stored season and `POST /escalation/...` exists (404 otherwise). |
 | `STORE` | unset: `off` | `free` turns on the four store routes; with `off` the storefront answers the old 400 and the three purchase routes 404. |
 | `STORE_REPEATABLE_TOKENS` | unset: off | `1` lists and sells the bounty-token bundle (only with `STORE=free`). |
+| `TRIALS_STORE` | unset: off | Turns on Lady Luck's Marks-priced store tags/SKUs without enabling the ordinary storefront. |
+| `MIDDLEMAN_STORE` | unset: off | Turns on the Middleman's slot unlock and Aetherdust store tags/SKUs without enabling the ordinary storefront. |
+| `TRIALS_LEADERBOARDS` | unset: off | Enables the restored Trials leaderboard/result routes. |
+| `TRIALS_SCHEDULE` | unset: off | Experimental active Trials schedule for testing whether the client can unlock Trials without the DLL Arena bypass. |
 | `SLAYER_LINKS` | unset: on | `0` makes every `/slayerlink` route answer 404, as before. |
 | `VERIFY_STUB_ACCOUNT` | unset: off | `1` puts back the fixed placeholder `account_id` in `GET /account/api/oauth/verify`. |
 | `BALANCE_FROM_INVENTORY` | unset: on | `0` puts back the fixed currency sheet in `GET /balance` and `POST /reconcile`. |
@@ -315,7 +319,7 @@ work on the host.
 | GET | `/playertreatments/:userId` | token | A fixed cohort list. |
 | GET | `/eventstats/` | token | Answers `{stats: []}`. |
 | GET | `/all/` | token | An empty mailbox. |
-| GET | `/game_tuning/seasonal_event_schedule` | none | No scheduled events. |
+| GET | `/game_tuning/seasonal_event_schedule` | none | Empty by default. With `TRIALS_SCHEDULE=1`, advertises the current Thursday-to-Thursday Normal/Dauntless Trial window, both current cooked matchmaker ids, and the captured `event_ladyluck_repeatable` schedule key. Experimental until verified by a real 1.4.4 client. |
 | GET | `/game_tuning/huntpass_xp_config` | none | The Hunt Pass XP configuration (`MaxXPAwarded` 200). |
 
 ### Characters, inventory and currency
@@ -335,17 +339,18 @@ work on the host.
 
 ### Store {#store}
 
-The in-game store ([The in-game store]({{ '/findings/store.html' | relative_url }})). **Only with
-`STORE=free`**; with `STORE=off` (the default) the storefront answers the old 400
-(`{"code": "400", "message": "The store is not available on Dauntless Revived yet."}`) and the other
-three routes the empty 404. Every route acts for the player of the bearer token: no token 401, the
-game-server key alone 403. Refusals are `{"code": "<status>", "message": ...}`.
+The in-game store ([The in-game store]({{ '/findings/store.html' | relative_url }})). The ordinary
+cosmetic storefront needs `STORE=free`; Lady Luck and the Middleman can independently expose only
+their own tags/SKUs with `TRIALS_STORE=1` or `MIDDLEMAN_STORE=1`. If all three are off, the
+storefront answers the old 400 and the purchase routes fall through to 404. Every active route acts
+for the player of the bearer token: no token 401, the game-server key alone 403. Refusals are
+`{"code": "<status>", "message": ...}`.
 
 | Method | Path | Access | What it does |
 |:-------|:-----|:-------|:-------------|
-| GET | `/product/skus/public?requiredTags=<tag>` | player | The offers of one tag, as a bare array, each with `remaining` (0 when every item it grants is held by the active character and every entitlement it grants is active). The store screen asks for `webstore` (200 offers; the Elite pass is under `season09b_pass`). An unknown tag is `[]` and a warning; no tag is 400. |
+| GET | `/product/skus/public?requiredTags=<tag>` | player | The offers of one enabled tag, as a bare array, each with `remaining`. `webstore`/Hunt Pass tags follow `STORE`; `ladyluckstore` follows `TRIALS_STORE`; `exchange_vendor_slot_2`, `exchange_vendor_slot_3` and `weekly_cell_offering` follow `MIDDLEMAN_STORE`. An unknown tag is `[]` when its store family is enabled. |
 | GET | `/product/sku/:skuId` | player | One offer, from any tag; 404 for an unknown one (or the bounty-token bundle while `STORE_REPEATABLE_TOKENS` is off). |
-| GET | `/token/:currency/:skuId` | player | `{purchaseToken}`: 64 hex characters, valid 10 minutes, bound to the account's active character and to the offer as it is now (a row in `storepurchases`, which stores only the token's SHA-256). `currency` must be `platinum` (400); only free offers of allowed items are sold (409); 404 for an unknown offer; 409 when the account has no character, already owns everything the offer grants, or has had 60 tokens in the last 10 minutes. |
+| GET | `/token/:currency/:skuId` | player | `{purchaseToken}`: 64 hex characters, valid 10 minutes, bound to the account's active character and to the offer as it is now. The currency must match the offer's one populated flat price field: Platinum for the ordinary free store, Steel/Gilded Marks for Lady Luck, or Aetherdust for Middleman cells (the service accepts the 1.4.4 `id_currency_*` and inventory-id aliases). 404 for a disabled/unknown offer; 409 for no character, ownership, insufficient balance, or the token rate limit. |
 | POST | `/notification/:currency?token=<token>` | player | Redeems the token and answers 204 with no body. In one transaction: the items through the inventory core (caller `store`, source `store:<sku>`, transaction id `store:<token hash>`; items the character already holds are skipped), the entitlements through the entitlement grant (source `store:<sku>`), then the token is marked redeemed. 403 for another account's or an unknown token, or one whose character is no longer the account's; 410 when it expired; 409 when the offer changed or is no longer sold; 400 for a malformed token or another currency. A token redeemed before answers 204 again and grants nothing. |
 
 The purchase token is removed from every log line (the request log never logs the query string, the
