@@ -171,7 +171,7 @@ export function SubmitTrialResult(Body: any){
             return {replayed: true, rewards: [] as any[], resultId: Existing.id};
         }
 
-        const Players = RawParty.map((Entry: any) => ParticipantFrom(Entry, tx));
+        const Players: Participant[] = RawParty.map((Entry: any) => ParticipantFrom(Entry, tx));
         if(new Set(Players.map((Player) => Player.phx_account_id)).size !== Players.length) throw new TrialsError(400, "party contains the same account more than once");
 
         const Category: TrialCategory = Body.category === undefined ? (Players.length === 1 ? "solo" : "group") : Body.category;
