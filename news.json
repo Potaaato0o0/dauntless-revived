@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-06T22:34:55.507954+00:00",
+      "title": "Launcher 0.1.21 — OCE Ramsgate, party routing and fleet status",
+      "body": "Choose Australia (OCE) in launcher Settings, then close and relaunch the game. OCE now has its own Ramsgate and hunts. Cross-region invitations still work, and parties follow the leader's region. OCE capacity waits no longer silently send you to Main. Training Grounds remains in Main.\n\nThe owner dashboard separates the combined fleet overview from Server #1, #2 and #3 pages, including CPU, memory, processes and worlds. Discord live status shows all three hosts without addresses or private player data. Live routing checks passed for Main and OCE Ramsgate; full in-game hunt completion remains under verification."
+    },
+    {
       "date": "2026-10-06T21:45:48.588300+00:00",
       "title": "Launcher 0.1.20 — Australia hunt region and fleet cleanup",
       "body": "Update the launcher, then choose Main or Australia (OCE) in Settings for hunts. Ramsgate remains shared. Parties stay together; mixed-region parties use the less crowded pool, with capacity fallback between regions.\n\nAll three servers have the latest merged backend changes. Empty hunts are reclaimed after ten minutes of confirmed inactivity, and temporary hunts have a two-hour maximum lifetime. Ramsgate and Training are exempt. The owner dashboard now monitors all three hosts. Pangar, Blaze Patrol and Blaze Escalation passed AUS startup checks; full player entry and completion on AUS are still being verified."
