@@ -11,6 +11,7 @@ import PlayerHuntTable from "../vendor/player_hunts_table.json";
 import MatchmakerHuntTable from "../vendor/matchmaker_hunts_table.json";
 import TrialsHardHuntTable from "../vendor/trials_hard_table.json";
 import TrialsEliteHuntTable from "../vendor/trials_elite_table.json";
+import { GetActiveTrialsData } from "../trials";
 import { kill } from "node:process";
 import { logger } from "../logger";
 import { CapacityUnavailable, memoryAdmission } from './capacity';
@@ -414,30 +415,12 @@ function GetGameModeOverrideFromMatchmakerHuntId(MatchmakerHuntId: string): stri
     return MatchmakerHuntObject.GameModeOverride.replaceAll("Archon/Content", "/Game");
 }
 
-type TrialsData = {
-    Behemoth: string;
-    TrialsHuntId: string;
-}
-
-function RandomlyGenTrialsData(IsElite: boolean): TrialsData{
-    const RandomTrialNum = String(crypto.randomInt(1, 89)).padStart(3, "0");
-
-    const Difficulty = IsElite ? "Elite" : "Hard";
-
-    const TrialsHuntId = `Arena_MatchmakerHunt_${Difficulty}_${RandomTrialNum}`;
-
-    const Row = IsElite ? (TrialsEliteHuntTable[0].Rows as any)[TrialsHuntId] : (TrialsHardHuntTable[0].Rows as any)[TrialsHuntId];
-
-    const Behemoth = Row.SpecificBehemoth.BehemothAsset.AssetPathName;
-
-    return {
-        Behemoth: Behemoth,
-        TrialsHuntId: TrialsHuntId
-    };
-}
 
 export async function StartupGameserverWithHuntIdAndPlayers(HuntId: string, ExpectedPlayers: string[]){
-    const TrialsData = HuntId.includes("Arena") ? RandomlyGenTrialsData(HuntId.includes("Elite")) : undefined;
+    const TrialsData = HuntId.includes("Arena") ? GetActiveTrialsData(HuntId.includes("Elite")) : undefined;
+    if(TrialsData !== undefined){
+        logger.info(`Active Trials rotation ${TrialsData.Rotation.rotationId}: ${TrialsData.TrialsHuntId}`);
+    }
     const MatchmakerHuntId = TrialsData == undefined ? GetMatchmakerHuntIdFromPlayerHuntId(HuntId) : TrialsData.TrialsHuntId;
     let BehemothPath = TrialsData == undefined ? GetBehemothPathFromMatchmakerHuntId(MatchmakerHuntId!) : TrialsData.Behemoth;
     let MapPath = TrialsData == undefined ? GetMapPathFromMatchmakerHuntId(MatchmakerHuntId!) : TRIALS_MAP_PATH;
