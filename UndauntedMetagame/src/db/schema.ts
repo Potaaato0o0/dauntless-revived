@@ -399,3 +399,27 @@ export const slayerlinks = sqliteTable("slayerlinks", {
     index("slayerlinks_sender").on(table.senderId),
     index("slayerlinks_target").on(table.targetId)
 ]);
+
+// Authenticated Trials completion history. All runs are retained; leaderboard reads select the
+// fastest personal/team best for the current deterministic rotation. partyJson preserves every member.
+export const trialsresults = sqliteTable("trialsresults", {
+    id: integer("id").notNull().primaryKey({autoIncrement: true}),
+    submissionId: text("submissionId").notNull(),
+    requestHash: text("requestHash").notNull(),
+    accountId: text("accountId").notNull(),
+    characterId: text("characterId").notNull(),
+    rotationId: text("rotationId").notNull(),
+    trialId: text("trialId").notNull(),
+    difficulty: integer("difficulty").notNull(),
+    category: text("category").notNull(),
+    completionTime: integer("completionTime").notNull(),
+    objectivesCompleted: integer("objectivesCompleted").notNull(),
+    sessionId: text("sessionId").notNull(),
+    partyKey: text("partyKey").notNull(),
+    partyJson: text("partyJson").notNull(),
+    completedDate: text("completedDate").notNull()
+}, (table) => [
+    uniqueIndex("trialsresults_submission").on(table.submissionId),
+    index("trialsresults_board").on(table.rotationId, table.difficulty, table.category, table.completionTime, table.completedDate),
+    index("trialsresults_account").on(table.accountId, table.rotationId)
+]);
