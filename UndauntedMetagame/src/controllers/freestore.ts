@@ -9,6 +9,7 @@ import { StoreRepeatableTokens } from "../features";
 import catalog from "../vendor/store_catalog.json";
 import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
+import ladyLuckCatalog from "../vendor/lady_luck_catalog.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
@@ -37,9 +38,9 @@ export class StoreError extends Error {
     }
 }
 
-type StoreItem = { catalogId: string, quantity: number };
+type StoreItem = { catalogId: string, quantity: number, grantKind?: "stacked" | "instanced" };
 type StoreGrant = { name: string, duration?: number };
-export type StoreOffer = { id: string, tags: string[], platinumPrice: number, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number, [Field: string]: unknown };
+export type StoreOffer = { id: string, tags: string[], platinumPrice?: number, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number, maxAllowed?: number | null, repeatable?: boolean, [Field: string]: unknown };
 
 const PURCHASE_TOKEN_MINUTES = 10;
 
@@ -63,10 +64,28 @@ export function SetStoreTokenLimitForTests(Limit?: number){
 }
 
 const Catalog = catalog as unknown as Record<string, unknown>;
+const LadyLuckOffers = (ladyLuckCatalog as unknown as {offers: StoreOffer[]}).offers;
+const LadyLuckIds = new Set(LadyLuckOffers.map((Offer) => Offer.id));
 
-// Every offer under every tag (keys starting with _ are notes)
-const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
-const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag] as StoreOffer[]);
+// Every offer under every tag. Lady Luck is recovered as a flat list whose offers carry their tags.
+const BaseCatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
+const LadyLuckTags = [...new Set(LadyLuckOffers.flatMap((Offer) => Offer.tags))];
+const CatalogTags = [...new Set([...BaseCatalogTags, ...LadyLuckTags])];
+const BaseOffers = BaseCatalogTags.flatMap((Tag) => Catalog[Tag] as StoreOffer[]);
+const AllOffers = [...BaseOffers, ...LadyLuckOffers];
+
+function OffersForTag(Tag: string){
+    const Base = BaseCatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]) : [];
+    return [...Base, ...LadyLuckOffers.filter((Offer) => Offer.tags.includes(Tag))];
+}
+
+export function IsLadyLuckStoreOffer(SkuId: string){
+    return LadyLuckIds.has(SkuId);
+}
+
+export function IsLadyLuckStoreTag(Tag: string){
+    return LadyLuckTags.includes(Tag);
+}
 
 let ExtraOffersForTests: StoreOffer[] = [];
 
@@ -94,24 +113,30 @@ const REPEATABLE_ITEMS = new Set(["TOKEN_BOUNTY_DRAFT_PREMIUM"]);
 // individual items wrong: most weapon skins and a few arrivals are instanced, a few fabrics and lanterns
 // stacked).
 const ITEM_KINDS = itemKinds as unknown as Record<string, string>;
+const LADY_LUCK_ITEM_KINDS = new Map<string, "stacked" | "instanced">();
+for(const Offer of LadyLuckOffers){
+    for(const Item of Offer.items ?? []){
+        if(Item.grantKind === "stacked" || Item.grantKind === "instanced") LADY_LUCK_ITEM_KINDS.set(Item.catalogId, Item.grantKind);
+    }
+}
 
 const Hash = (Value: string) => createHash("sha256").update(Value).digest("hex");
 const OfferHash = (Offer: StoreOffer) => Hash(JSON.stringify(Offer));
 
 export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefined {
-    if(!REPEATABLE_ITEMS.has(CatalogId) && !COSMETIC_PREFIXES.some((Prefix) => CatalogId.startsWith(Prefix))){
-        return undefined;
-    }
+    const LadyLuckKind = LADY_LUCK_ITEM_KINDS.get(CatalogId);
+    if(LadyLuckKind !== undefined) return LadyLuckKind;
+
+    if(!REPEATABLE_ITEMS.has(CatalogId) && !COSMETIC_PREFIXES.some((Prefix) => CatalogId.startsWith(Prefix))) return undefined;
 
     const Kind = ITEM_KINDS[CatalogId];
-
     return Kind === "stacked" || Kind === "instanced" ? Kind : undefined;
 }
 
 // A repeatable offer sells consumables only; it is never "owned", and each purchase grants its full quantity
 function IsRepeatable(Offer: StoreOffer){
+    if(LadyLuckIds.has(Offer.id)) return Offer.maxAllowed == null || Offer.repeatable === true;
     const Items = Offer.items ?? [];
-
     return Items.length > 0 && Items.every((Item) => REPEATABLE_ITEMS.has(Item.catalogId));
 }
 
@@ -167,12 +192,15 @@ function CheckOffer(Offer: StoreOffer){
         throw new StoreError(409, "Repeatable offers cannot grant entitlements");
     }
 
+    const LadyLuck = LadyLuckIds.has(Offer.id);
     const Unsupported = Items.some((Item) => GrantKind(Item.catalogId) === undefined ||
-        REPEATABLE_ITEMS.has(Item.catalogId) !== Repeatable ||
-        (Repeatable ? GrantKind(Item.catalogId) !== "stacked" || !Number.isSafeInteger(Item.quantity) || Item.quantity <= 0 : Item.quantity !== 1));
+        !Number.isSafeInteger(Item.quantity) || Item.quantity <= 0 ||
+        (!LadyLuck && (REPEATABLE_ITEMS.has(Item.catalogId) !== Repeatable ||
+            (Repeatable ? GrantKind(Item.catalogId) !== "stacked" : Item.quantity !== 1))) ||
+        (LadyLuck && !Repeatable && Item.quantity !== 1));
 
     if(Unsupported){
-        throw new StoreError(409, "Offer is not a supported free item");
+        throw new StoreError(409, "Offer contains an unsupported store item");
     }
 
     if(Grants.some((Grant) => typeof Grant.name !== "string" || Grant.name.length === 0 || (Grant.duration !== undefined && (!Number.isSafeInteger(Grant.duration) || Grant.duration < 0)))){
@@ -224,12 +252,14 @@ function WithRemaining(tx: Tx, AccountId: string, Held: Set<string>, Offer: Stor
         && Items.every((Item) => Held.has(Item.catalogId))
         && Grants.every((Grant) => HasActiveEntitlement(tx, AccountId, Grant.name));
 
-    return {...Offer, remaining: Owned ? 0 : 1};
+    const PublicItems = (Offer.items ?? []).map(({grantKind: _grantKind, ...Item}) => Item);
+    const {repeatable: _repeatable, ...PublicOffer} = Offer;
+    return {...PublicOffer, items: PublicItems, remaining: Owned ? 0 : 1} as StoreOffer;
 }
 
 // GET /product/skus/public?requiredTags=<tag>. An unknown tag is an empty list.
 export function ListStoreOffers(AccountId: string, Tag: string): StoreOffer[] {
-    const ForTag = CatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]).filter(IsListed) : [];
+    const ForTag = CatalogTags.includes(Tag) ? OffersForTag(Tag).filter(IsListed) : [];
 
     return GetDb().transaction((tx) => {
         const Held = HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId);

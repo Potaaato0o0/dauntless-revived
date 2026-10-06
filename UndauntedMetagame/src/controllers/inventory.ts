@@ -5,6 +5,7 @@ import { characters, inventory, inventorylog, inventorytransactions } from "../d
 import { logger } from "../logger";
 import { DoesCharacterBelongToUserId } from "./character";
 import type { Tx } from "./savehistory";
+import LadyLuckCatalog from "../vendor/lady_luck_catalog.json";
 
 export type InventoryError = "forbidden" | "not_found" | "conflict" | "insufficient_quantity" | "invalid_inventory_item" | "invalid_inventory_data" | "db_error";
 export type InventoryResult<T = void> = { success: true, data?: T } | { success: false, error: InventoryError };
@@ -13,6 +14,31 @@ export type InventoryResult<T = void> = { success: true, data?: T } | { success:
 export type InventoryCaller = "client" | "gameserver" | "admin" | "store";
 export type InventoryContext = { Caller: InventoryCaller, Source?: unknown };
 export type TransactionResponse = { createdInstancedItems: any, updatedInstancedItems: any[], updatedStackedItems: any[], removedInstancedItems: any };
+
+const EXCHANGE_TOKEN = "TOKEN_CELL_EXCHANGE";
+const PROTECTED_CURRENCIES = new Set(["CURRENCY_CELLDUST", "CURRENCY_TOKEN_EXCHANGE_SPEED_UP", "CURRENCY_MARKS_STEEL", "CURRENCY_MARKS_GILDED"]);
+const LADY_LUCK_ITEMS = new Set((LadyLuckCatalog as unknown as {offers: {items?: {catalogId: string}[]}[]}).offers.flatMap((Offer) => Offer.items ?? []).map((Item) => Item.catalogId));
+
+function IsCell(CatalogId: unknown){ return typeof CatalogId === "string" && CatalogId.startsWith("CELL_"); }
+function IsTrustedOnlyCatalog(CatalogId: unknown){
+    return CatalogId === EXCHANGE_TOKEN || (typeof CatalogId === "string" && (PROTECTED_CURRENCIES.has(CatalogId) || LADY_LUCK_ITEMS.has(CatalogId))) || IsCell(CatalogId);
+}
+function ExchangeSlotId(Item: any){
+    if(Item?.catalogId !== EXCHANGE_TOKEN) return undefined;
+    let Data = Item.itemData;
+    if(typeof Data === "string"){ try{ Data = JSON.parse(Data); } catch { return undefined; } }
+    const Slot = Data?.SlotID ?? Data?.slotId ?? Data?.slotID;
+    return Number.isSafeInteger(Slot) ? Slot as number : undefined;
+}
+function AssertUniqueExchangeSlots(Items: any[]){
+    const Seen = new Set<number>();
+    for(const Item of Items){
+        const Slot = ExchangeSlotId(Item);
+        if(Slot === undefined) continue;
+        if(Seen.has(Slot)) throw new InventoryConflictError(`Middleman exchange slot ${Slot} is already occupied`);
+        Seen.add(Slot);
+    }
+}
 
 // One POST /inventory body, the lists exactly as they arrived (undefined when missing)
 export type InventoryTransactionRequest = {
@@ -303,6 +329,11 @@ function LogInstancedItem(Operation: string, Item: any): LogEntry{
 }
 
 export async function UpdateInstancedItem(CharacterId: string, UserId: string, InstanceId: string, CatalogId: string, ItemData: string | null | undefined, UpdateVersion: number, Context: InventoryContext = {Caller: "client"}): Promise<InventoryResult<any>>{
+    if(Context.Caller === "client" && IsTrustedOnlyCatalog(CatalogId)){
+        logger.warn(`Refusing client update of protected inventory item ${CatalogId}`);
+        return {success: false, error: "forbidden"};
+    }
+
     if(!await DoesCharacterBelongToUserId(UserId, CharacterId)){
         logger.error(`Specified characterId ${CharacterId} does not belong to user ${UserId}`);
         return {success: false, error: "forbidden"};
@@ -383,6 +414,21 @@ type PreparedInventoryTransaction = {
     RequestHash: string
 };
 
+function HasProtectedClientMutation(Prepared: PreparedInventoryTransaction){
+    return Prepared.InstancedItemsToAdd.some((Item) => IsTrustedOnlyCatalog(Item.catalogId))
+        || Prepared.StackedItemsToAdd.some((Item) => IsTrustedOnlyCatalog(Item.catalogId))
+        || Prepared.InstancedItemsToRemove.some((Item) => IsTrustedOnlyCatalog(Item.catalogId))
+        || Prepared.StackedItemsToRemove.some((Item) => IsTrustedOnlyCatalog(Item.catalogId))
+        || Prepared.InstancedItemsToSave.some((Item) => IsTrustedOnlyCatalog(Item.catalogId));
+}
+function IsMiddlemanMutation(Prepared: PreparedInventoryTransaction, Context: InventoryContext){
+    if(Context.Caller !== "gameserver") return false;
+    const Instanced = [...Prepared.InstancedItemsToAdd, ...Prepared.InstancedItemsToRemove, ...Prepared.InstancedItemsToSave];
+    return Instanced.some((Item) => Item.catalogId === EXCHANGE_TOKEN)
+        || Prepared.StackedItemsToAdd.some((Item) => Item.catalogId === "CURRENCY_CELLDUST")
+        || Prepared.StackedItemsToRemove.some((Item) => Item.catalogId === "CURRENCY_TOKEN_EXCHANGE_SPEED_UP");
+}
+
 // The checks that need no database: every list is a list of items. Throws InventoryValidationError.
 function PrepareInventoryTransaction(Request: InventoryTransactionRequest): PreparedInventoryTransaction {
     const InstancedItemsToAdd = Request.InstancedItemsToAdd ?? [];
@@ -438,6 +484,16 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
     const { Request, InstancedItemsToAdd, StackedItemsToAdd, InstancedItemsToRemove, StackedItemsToRemove, InstancedItemsToSave, DedupeKey, RequestHash } = Prepared;
     const { UserId, CharacterId, TransactionId } = Request;
 
+    if(Context.Caller === "client" && HasProtectedClientMutation(Prepared)){
+        throw new InventoryForbiddenError("The player client cannot mutate protected Middleman, Trials, or Lady Luck inventory directly");
+    }
+    const MiddlemanMutation = IsMiddlemanMutation(Prepared, Context);
+    const StartsExchange = InstancedItemsToAdd.some((Item) => Item.catalogId === EXCHANGE_TOKEN);
+    const GrantsDust = StackedItemsToAdd.some((Item) => Item.catalogId === "CURRENCY_CELLDUST" && Number(Item.quantity) > 0);
+    if(Context.Caller === "gameserver" && (StartsExchange || GrantsDust) && InstancedItemsToRemove.length === 0){
+        throw new InventoryValidationError("Middleman exchange/dusting must consume an instanced source item atomically");
+    }
+
     if(DedupeKey != undefined){
         const Stored = tx.select().from(inventorytransactions).where(and(
             eq(inventorytransactions.characterId, CharacterId),
@@ -488,6 +544,7 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
                 DidUpdateInstancedItems = true;
             }
             else{
+                if(MiddlemanMutation) throw new InventoryConflictError(`Middleman transaction removes instanced item ${ItemToRemove.catalogId}/${ItemToRemove.instanceId}, which is not held`);
                 logger.warn(`transactionId ${TransactionId} removes instanced item ${ItemToRemove.catalogId}/${ItemToRemove.instanceId}, which characterId ${CharacterId} does not hold; ignored`);
             }
         }
@@ -533,6 +590,7 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
         }
 
         if(DidUpdateInstancedItems){
+            if(Context.Caller === "gameserver") AssertUniqueExchangeSlots(InstancedItems);
             Update.instancedItems = JSON.stringify(InstancedItems);
         }
     }
@@ -540,7 +598,8 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
     if(Prepared.ShouldTouchStackedItems){
         const StackedItems: any[] = JSON.parse(CurrentInventory.stackedItems);
 
-        const Applied = ApplyStackedChanges(StackedItems, StackedItemsToRemove, StackedItemsToAdd, IsOverspendRefused());
+        const StrictProtectedSpend = StackedItemsToRemove.some((Item) => PROTECTED_CURRENCIES.has(Item.catalogId));
+        const Applied = ApplyStackedChanges(StackedItems, StackedItemsToRemove, StackedItemsToAdd, IsOverspendRefused() || StrictProtectedSpend);
         TouchedStackedItems = Applied.Touched;
         Overspent = Applied.Overspent;
         Log.push(...Applied.Log);
@@ -589,6 +648,10 @@ export function ApplyInventoryTransactionInTx(tx: Tx, Request: InventoryTransact
     AssertCharacterOwnedInTx(tx, Request.UserId, Request.CharacterId);
 
     const Prepared = PrepareInventoryTransaction(Request);
+
+    if(Context.Caller === "client" && HasProtectedClientMutation(Prepared)){
+        throw new InventoryForbiddenError("The player client cannot mutate protected Middleman, Trials, or Lady Luck inventory directly");
+    }
 
     if(!Prepared.ShouldTouchInstancedItems && !Prepared.ShouldTouchStackedItems){
         return {response: MakeTransactionResponse(Request, []), replayed: false, overspent: []};
@@ -646,6 +709,11 @@ export async function RunInventoryTransaction(UserId: string, CharacterId: strin
     catch(error){
         logger.warn(`transactionId ${TransactionId} for userId ${UserId} and characterId ${CharacterId}: ${(error as Error).message}`);
         return {success: false, error: "invalid_inventory_item"};
+    }
+
+    if(Context.Caller === "client" && HasProtectedClientMutation(Prepared)){
+        logger.warn(`Refusing protected inventory mutation from player client for userId ${UserId}`);
+        return {success: false, error: "forbidden"};
     }
 
     if(!Prepared.ShouldTouchInstancedItems && !Prepared.ShouldTouchStackedItems){

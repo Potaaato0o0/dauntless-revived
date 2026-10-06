@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth";
 import { GetHeldCurrencies, GetNotesForUser, OverlayHeldCurrencies } from "../controllers/store";
 import { PlayerTokenOnly } from "../middleware/PlayerAuth";
-import { CreateStorePurchase, GetStoreOffer, IsKnownStoreTag, ListStoreOffers, RedeemStorePurchase, StoreError } from "../controllers/freestore";
+import { CreateStorePurchase, GetStoreOffer, IsKnownStoreTag, IsLadyLuckStoreOffer, IsLadyLuckStoreTag, ListStoreOffers, RedeemStorePurchase, StoreError } from "../controllers/freestore";
 import { BalanceFromInventory, StoreMode } from "../features";
 
 export const storeRouter = Router();
@@ -128,8 +128,18 @@ storeRouter.get("/balance", HasUndauntedMetagameAuth, async (req: any, res) => {
 // whose token it carries; a game server's key alone gets 403. The four routes are adapted from the
 // store routes of Harmonic's fork (github.com/Harmonicrain/Undaunted 895f7c7, routes/store.ts).
 
-function StoreOn(req: any, res: any, next: any){
-    next(StoreMode() === "free" ? undefined : "route");
+function StoreListOn(req: any, _res: any, next: any){
+    const Tag = req.query.requiredTags;
+    next(StoreMode() === "free" || (typeof Tag === "string" && IsLadyLuckStoreTag(Tag)) ? undefined : "route");
+}
+
+function StoreOfferOn(req: any, _res: any, next: any){
+    next(StoreMode() === "free" || IsLadyLuckStoreOffer(req.params.skuId) ? undefined : "route");
+}
+
+function StoreCurrencyOn(req: any, _res: any, next: any){
+    const Currency = req.params.currency;
+    next(StoreMode() === "free" || Currency === "markssteel" || Currency === "marksgilded" ? undefined : "route");
 }
 
 function SendStoreError(res: any, error: unknown, What: string){
@@ -146,7 +156,7 @@ function SendStoreError(res: any, error: unknown, What: string){
 }
 
 // StoreGetItemByTagEndpoint: a bare array of offers
-storeRouter.get("/product/skus/public", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     const RequiredTags = req.query.requiredTags;
 
     if(typeof RequiredTags !== "string" || RequiredTags.length === 0){
@@ -175,7 +185,7 @@ storeRouter.get("/product/skus/public", StoreOn, HasUndauntedMetagameAuth, Playe
 });
 
 // StoreGetItemByIdEndpoint: one offer, for the purchase dialog
-storeRouter.get("/product/sku/:skuId", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+storeRouter.get("/product/sku/:skuId", StoreOfferOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     try{
         res.status(200);
         res.json(GetStoreOffer(req.AuthData.userId, req.params.skuId));
@@ -186,7 +196,7 @@ storeRouter.get("/product/sku/:skuId", StoreOn, HasUndauntedMetagameAuth, Player
 });
 
 // StorePurchaseItemEndpoint: {purchaseToken}. Whatever else the request carries is ignored.
-storeRouter.get("/token/:currency/:skuId", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+storeRouter.get("/token/:currency/:skuId", StoreOfferOn, StoreCurrencyOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     try{
         res.status(200);
         res.json(CreateStorePurchase(req.AuthData.userId, req.params.currency, req.params.skuId));
@@ -197,7 +207,7 @@ storeRouter.get("/token/:currency/:skuId", StoreOn, HasUndauntedMetagameAuth, Pl
 });
 
 // StorePurchaseItemConfirmEndpoint: redeems the token; 204, also for a token already redeemed
-storeRouter.post("/notification/:currency", StoreOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
+storeRouter.post("/notification/:currency", StoreCurrencyOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     try{
         RedeemStorePurchase(req.AuthData.userId, req.params.currency, req.query.token);
         res.status(204);
