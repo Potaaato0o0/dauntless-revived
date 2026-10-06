@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-06T23:46:42.482210+00:00",
+      "title": "Strict AU worlds and automatic load protection",
+      "body": "Australia (OCE) now keeps Ramsgate, hunts and Training Grounds in AU. AU waits for AU capacity instead of silently sending you to EU. Joining an EU-led party is the exception: the party follows its leader. Old hunt assignments are discarded when the selected region changes.\n\nNew hunts stop being placed on a host when its CPU is too busy. EU overflow can automatically use available AUS capacity, with slots reserved for direct AU players. Update to launcher 0.1.23 or later, choose Australia under World region and press Play to save the choice; the stock game region setting is separate."
+    },
+    {
       "date": "2026-10-06T23:02:00.709600+00:00",
       "title": "Launcher 0.1.23 — OCE selection and connection fix",
       "body": "Update the launcher, choose Australia (OCE) in Settings, close the game and press Play. The launcher was discarding the region change; that is fixed in 0.1.23.\n\nWe also corrected the AUS firewall rule that blocked the current game executable. Live OCE player connections are now confirmed. Koshai attempts sent to AUS were affected too; full hunt completion remains under verification."
