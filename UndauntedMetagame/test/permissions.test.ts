@@ -143,6 +143,8 @@ before(async () => {
     Listening = await new Promise<Server>((Resolve, Reject) => {
         const Started = app.listen(PERMISSIONS_API_PORT, "127.0.0.1", (Error?: Error) => Error ? Reject(Error) : Resolve(Started));
     });
+    // Match appclient: synchronous fixture writes can outlast an idle pooled socket on slow CI.
+    Listening.keepAliveTimeout = 0;
 
     // Real data for A, written the way the game server writes it
     assert.equal((await Call("POST", `/progression/${A}`, { gs: true, as: A, body: { progress_tracks: [{ progression_id: "season09b", progress: 150 }], objectives: [{ objective_id: "OBJ_X", value: 3, completed_count: 0 }] } })).status, 200);
