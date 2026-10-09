@@ -21,7 +21,7 @@ export function payload(sample, now = Date.now(), fleet = null) {
     const r=fleet?.rows?.[i];
     fields.push({name,inline:true,value:r?.online
       ? `🟢 Online\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB`
-      : '🟠 Unavailable / stale'});
+      : '🟠 Monitoring unavailable'});
   }
   if(fleet){
     fields.push({name:'📊 Reporting hosts combined',value:`Mean CPU: ${num(fleet.meanCpu,'%')}\nRAM: ${num(fleet.ramUsedMB/1024)} / ${num(fleet.ramTotalMB/1024)} GB\n${fleet.online}/${fleet.servers} hosts reporting; unavailable hosts excluded.`});
@@ -31,7 +31,7 @@ export function payload(sample, now = Date.now(), fleet = null) {
     fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
   }
   fields.push({name:'Region guide',value:'Main is now EU. Choose EU, Germany or Australia (OCE) in launcher Settings, then relaunch. EU uses its overflow workers. Germany and OCE stay in their selected region unless joining a party led elsewhere. Parties follow their leader; invitations work across regions.'});
-  fields.push({name:'📥 Launcher 0.1.26 · Cloudflare downloads',value:'Update your launcher for direct Cloudflare game downloads, resume support and verified files. Existing verified installs need no redownload. Includes the Trials, Lady Luck and Middleman DLL. [Download / release notes](https://github.com/mixutin/dauntless-revived/releases/tag/launcher-v0.1.26)'});
+  fields.push({name:'📥 Launcher 0.1.31 · Developer tags',value:'Update your launcher for direct Cloudflare game downloads, resume support and verified files. Existing verified installs need no redownload. Includes the Trials, Lady Luck and Middleman DLL. [Download / release notes](https://github.com/mixutin/dauntless-revived/releases/tag/launcher-v0.1.31)'});
   fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
   return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',
     description:online?'**Clear skies, Slayers.** Shared accounts and progression across EU, Germany and OCE.':'The shared backend is currently unavailable. Please check again shortly.',
@@ -44,7 +44,7 @@ export async function sampleBackend(backend, key, fetcher = fetch) {
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password) throw new Error('Backend must use loopback HTTP');
   const start = performance.now();
   try {
-    const res = await fetcher(new URL('/undaunted/api/ServerStatus', url), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(3000), redirect: 'error'});
+    const res = await fetcher(new URL('/undaunted/api/ServerStatus', url), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(8000), redirect: 'error'});
     if (!res.ok) return null;
     const data = await res.json();
     if (data.online !== true || data.limited !== false || !Number.isInteger(data.playersOnline) || data.playersOnline < 0 || !Number.isFinite(data.uptimeSeconds) || data.uptimeSeconds < 0) return null;
@@ -142,7 +142,7 @@ export async function sampleFleet(dashboard, key, fetcher=fetch) {
   const url=new URL(dashboard);
   if(url.protocol!=='http:' || url.hostname!=='127.0.0.1' || url.username || url.password)throw new Error('Dashboard must use loopback HTTP');
   try {
-    const r=await fetcher(new URL('/api/status',url),{headers:{'x-dashboard-key':key},signal:AbortSignal.timeout(3000),redirect:'error'});
+    const r=await fetcher(new URL('/api/status',url),{headers:{'x-dashboard-key':key},signal:AbortSignal.timeout(8000),redirect:'error'});
     if(!r.ok)return null;
     const data=await r.json(), f=data.fleet;
     if(!Array.isArray(f?.rows) || f.rows.length<3 || f.rows.length>4)return null;

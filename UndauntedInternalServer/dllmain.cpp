@@ -31,6 +31,7 @@
 #include "CellFusionTime.h"
 #include "VendorTabs.h"
 #include "NoPlatinumPrice.h"
+#include "DeveloperStyle.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/Archon_parameters.hpp"
@@ -686,6 +687,7 @@ void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     AutoPressStart::OnProcessEvent(Object, Function);
     VendorTabs::OnProcessEvent(Object);
     NoPlatinumPrice::OnProcessEvent(Object);
+    DeveloperStyle::OnProcessEvent(Object, Function);
 
     static UFunction* CanPurchase = nullptr;
     if (Function == CanPurchase || (!CanPurchase && Function && Function->GetFullName().contains("EquipmentItemViewModel.CanPurchase"))) {

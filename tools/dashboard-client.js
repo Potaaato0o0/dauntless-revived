@@ -50,10 +50,10 @@
     if(prefix==='worker')lastWorker=worker;else if(prefix==='aus')lastAus=worker;else lastGermany=worker;
     const el=id=>document.getElementById(id.replace(/^worker/,prefix));
     const s=worker?.sample;
-    el('workerConnection').textContent=!worker?.configured?'Not configured':worker.online?'Connected':'Unavailable · stale';
+    el('workerConnection').textContent=!worker?.configured?'Not configured':worker.online?(worker.status==='delayed'?'Monitoring delayed · last sample retained':'Connected'):'Monitoring unavailable';
     el('workerError').textContent=worker?.error||'';
     if(!s)return;
-    el('workerFreshness').textContent=`${Date.now()-Date.parse(s.at)>15000?'STALE — ':''}Sample: ${new Date(s.at).toLocaleString()}`;
+    el('workerFreshness').textContent=`${Date.now()-Date.parse(s.at)>30000?'STALE — ':''}Sample: ${new Date(s.at).toLocaleString()}`;
     el('workerCpu').textContent=number(s.cpu,'%');el('workerCores').textContent=`${s.logicalCpus} logical processors`;
     el('workerMemory').textContent=`${number(s.ramUsedMB/1024)} / ${number(s.ramTotalMB/1024)} GB`;
     el('workerDisk').textContent=`Disk free ${number(s.diskFreeGB)} GB`;
@@ -135,16 +135,27 @@
   };
   function showAccounts() {
     const query = el('accountSearch').value.trim().toLowerCase();
-    table('accountRows', accountPage.filter(a => `${a.name} ${a.id} ${a.keyFingerprint || ''}`.toLowerCase().includes(query)).map(a => [a.name, a.id, a.admin ? 'Administrator' : 'Player', a.keyFingerprint || 'No active key']));
+    const visible=accountPage.filter(a => `${a.name} ${a.id} ${a.keyFingerprint || ''}`.toLowerCase().includes(query));
+    table('accountRows',visible.map(a => [a.name,a.id,a.developer?'Server Developer':a.admin?'Administrator':'Player',a.keyFingerprint || 'No active key']));
+    Array.from(el('accountRows').children).forEach((row,i)=>{
+      if(!visible[i]?.developer)return;
+      row.classList.add('developer-row');
+      const role=row.children[2];role.textContent='';
+      for(const [text,cls] of [['[ ','developer-bracket'],['Server Developer','developer-label'],[' ]','developer-bracket']]){
+        const span=document.createElement('span');span.textContent=text;span.className=cls;role.appendChild(span);
+      }
+    });
   }
+  let pendingAccountSearch=false, searchTimer;
   async function loadAccounts() {
-    if (!key || accountsBusy) return;
+    if (!key) return;
+    if (accountsBusy) { pendingAccountSearch=true; return; }
     accountsBusy = true; el('refreshAccounts').disabled = true;
-    try { const result = await get(`/api/accounts?offset=${accountOffset}`); accountPage = result.accounts; nextOffset = result.nextOffset; showAccounts(); el('accountStatus').textContent = `Accounts ${accountOffset + (accountPage.length ? 1 : 0)}–${accountOffset + accountPage.length}. Filter applies to this page.`; }
+    try { const result = await get(`/api/accounts?offset=${accountOffset}&q=${encodeURIComponent(el('accountSearch').value.trim())}`); accountPage = result.accounts; nextOffset = result.nextOffset; showAccounts(); el('accountStatus').textContent = `Accounts ${accountOffset + (accountPage.length ? 1 : 0)}–${accountOffset + accountPage.length}. Search covers all accounts.`; }
     catch (error) { accountPage = []; nextOffset = null; showAccounts(); el('accountStatus').textContent = `${error.message} Account directory may require a backend update.`; }
-    finally { accountsBusy = false; el('refreshAccounts').disabled = false; el('previousAccounts').disabled = accountOffset === 0; el('nextAccounts').disabled = nextOffset === null; }
+    finally { accountsBusy = false; el('refreshAccounts').disabled = false; el('previousAccounts').disabled = accountOffset === 0; el('nextAccounts').disabled = nextOffset === null; if(pendingAccountSearch){pendingAccountSearch=false;void loadAccounts();} }
   }
-  el('accountSearch').oninput = showAccounts;
+  el('accountSearch').oninput = () => {accountOffset=0;clearTimeout(searchTimer);searchTimer=setTimeout(loadAccounts,300);};
   el('loadModeration').onclick = async () => {
     try {const info=await get(`/api/moderation?accountId=${encodeURIComponent(el('moderationAccount').value.trim())}`);el('moderationInfo').textContent=JSON.stringify(info,null,2);el('moderationStatus').textContent='Current moderation status loaded.';}
     catch(error){el('moderationStatus').textContent=error.message;}
@@ -168,7 +179,7 @@
   el('identifyKey').onclick = async () => {
     const value = el('matchKey').value.trim(); el('matchKey').value = '';
     if (!value) return;
-    try { const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); const fingerprint = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16); el('matchResult').textContent = `Fingerprint: ${fingerprint}. Computed in this browser; the key was not sent. Compare against the account list.`; el('accountSearch').value = fingerprint; showAccounts(); }
+    try { const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); const fingerprint = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16); el('matchResult').textContent = `Fingerprint: ${fingerprint}. Computed in this browser; the key was not sent. Compare against the account list.`; el('accountSearch').value = fingerprint; accountOffset=0; loadAccounts(); }
     catch { el('matchResult').textContent = 'Local hashing unavailable. Use the dashboard through localhost.'; }
   };
   el('createInvite').onclick = async () => {

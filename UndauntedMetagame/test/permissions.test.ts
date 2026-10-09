@@ -54,7 +54,16 @@ it('dashboard account directory exposes names and short fingerprints, never logi
     assert.equal(reply.text.includes(Players[A].Key), false);
     assert.equal(reply.text.includes(HashUserAPIKey(Players[A].Key)), false);
     assert.equal((await Call('GET', '/undaunted/api/DashboardAccounts?offset=-1', {key: Players[ADMIN].Key})).status, 400);
-    const empty = await Call('GET', '/undaunted/api/DashboardAccounts?offset=99999', {key: Players[ADMIN].Key});
+    const raw=GetDb().$client;
+    for(let i=0;i<105;i++)raw.prepare('INSERT INTO users(userId,name,notes) VALUES (?,?,0)').run('UID-zz-search-'+String(i).padStart(3,'0'),'DirectorySearch'+i);
+    try {
+        const beyond=await Call('GET','/undaunted/api/DashboardAccounts?offset=0&q=DirectorySearch104',{key:Players[ADMIN].Key});
+        assert.deepEqual(beyond.json.accounts.map((a:any)=>a.name),['DirectorySearch104']);
+    } finally { raw.prepare("DELETE FROM users WHERE userId LIKE 'UID-zz-search-%'").run(); }
+    const search=await Call('GET','/undaunted/api/DashboardAccounts?offset=0&q='+encodeURIComponent(A),{key:Players[ADMIN].Key});
+    assert.deepEqual(search.json.accounts.map((a:any)=>a.id),[A]);
+    assert.equal((await Call('GET','/undaunted/api/DashboardAccounts?offset=0&q=%25',{key:Players[ADMIN].Key})).json.accounts.length,0);
+    const empty = await Call('GET', '/undaunted/api/DashboardAccounts?offset=99999' , {key: Players[ADMIN].Key});
     assert.deepEqual(empty.json, {accounts: [], nextOffset: null});
 });
 

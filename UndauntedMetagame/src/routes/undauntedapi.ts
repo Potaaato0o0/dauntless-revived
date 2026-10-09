@@ -29,7 +29,7 @@ import { IsSoftRegisteredCaller, SoftAccountAuth } from "../middleware/SoftAccou
 import { AdminMutationRateLimit, HealthReadRateLimit } from "../middleware/RateLimits";
 import { BackendHealthEnabled, BackendRuntimeHealth } from '../middleware/BackendHealth';
 import { userapikeys, users } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
 
@@ -76,9 +76,13 @@ undauntedApiRouter.get('/DashboardAccounts', HealthReadRateLimit, HasUndauntedAd
     res.setHeader('Cache-Control', 'no-store');
     const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 10000000) { res.status(400).json({error: 'invalid_offset'}); return; }
+    const query=typeof req.query.q==='string'?req.query.q.trim():'';
+    if(query.length>100){res.status(400).json({error:'invalid_query'});return;}
     const rows = GetDb().select({id: users.userId, name: users.name, admin: users.isAdmin, hash: userapikeys.keyHash})
-        .from(users).leftJoin(userapikeys, eq(users.userId, userapikeys.userId)).orderBy(users.userId).limit(101).offset(offset).all();
-    res.json({accounts: rows.slice(0, 100).map(row => ({id: row.id, name: row.name, admin: row.admin,
+        .from(users).leftJoin(userapikeys, eq(users.userId, userapikeys.userId))
+        .where(query ? sql`instr(lower(${users.name}), lower(${query})) > 0 OR instr(lower(${users.userId}), lower(${query})) > 0 OR instr(lower(substr(${userapikeys.keyHash},1,16)), lower(${query})) > 0` : undefined)
+        .orderBy(users.userId).limit(101).offset(offset).all();
+    res.json({accounts: rows.slice(0, 100).map(row => ({id: row.id, name: row.name, admin: row.admin, developer:(process.env.DEVELOPER_ACCOUNT_IDS || '').split(',').map(x=>x.trim()).includes(row.id),
         keyFingerprint: row.hash && /^[a-f0-9]{64}$/i.test(row.hash) ? row.hash.slice(0, 16).toLowerCase() : null})),
         nextOffset: rows.length > 100 ? offset + 100 : null});
 });

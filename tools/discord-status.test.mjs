@@ -11,7 +11,7 @@ test('four-server fleet remains visible when one monitor is stale', async () => 
  const b=payload({players:12,uptime:5,ms:1},Date.now(),f);
  const s=JSON.stringify(b);
  assert.ok(s.includes('Server #4 · Germany'));assert.ok(s.includes('6 reported · partial'));assert.ok(s.includes('35.0%'));
- assert.ok(!s.includes('Monitoring unavailable'));assert.ok(!s.includes('Server #1 · Main'));
+ assert.equal(b.embeds[0].fields[1].value,'3 / 4 hosts reporting');assert.ok(!s.includes('Server #1 · Main'));
  assert.ok(s.includes('Cloudflare'));assert.ok(s.length<6000);
 });
 const url = 'https://discord.com/api/webhooks/123/test-token';

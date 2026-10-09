@@ -26,7 +26,7 @@ export async function startWorkerHealth({port=61111,root=process.cwd(),allowlist
   let prior=cpuTimes(), priorProcesses, processInfo=null, sample=null, busy=false, collecting=false;
   const eventLoopStart=performance.now();
   async function probe(url, headers) {
-    try { const r=await fetcher(url,{headers,redirect:'error',signal:AbortSignal.timeout(2000)}); if(!r.ok)return null; return await r.json(); }catch{return null;}
+    try { const r=await fetcher(url,{headers,redirect:'error',signal:AbortSignal.timeout(8000)}); if(!r.ok)return null; return await r.json(); }catch{return null;}
   }
   async function poll() {
     if(busy)return; busy=true;

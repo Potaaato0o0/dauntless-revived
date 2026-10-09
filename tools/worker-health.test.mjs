@@ -42,3 +42,10 @@ test('main dashboard exposes worker health only behind owner authentication and 
 test('main dashboard rejects remote worker URLs',async()=>{
   await assert.rejects(startDashboard({key:'owner-key-long-enough',port:0,backend:'http://127.0.0.1:61000',workerUrl:'https://example.com'}),/loopback tunnel/);
 });
+
+test('worker monitoring tolerates a missed poll, expires, and recovers',async()=>{
+ const {monitorWorker}=await import('./dashboard-worker.mjs');
+ let now=Date.now(),fail=false;
+ const monitor=await monitorWorker('http://127.0.0.1:61112','test',async()=>{if(fail)throw Error('timeout');return new Response(JSON.stringify({at:new Date(now).toISOString(),services:{deploy:true},hunts:[]}));},()=>now);
+ try{fail=true;now+=6000;await monitor.poll();assert.equal(monitor.state.online,true);assert.equal(monitor.state.status,'delayed');now+=25000;assert.equal(monitor.state.online,false);fail=false;await monitor.poll();assert.equal(monitor.state.online,true);assert.equal(monitor.state.status,'online');}finally{monitor.close();}
+});

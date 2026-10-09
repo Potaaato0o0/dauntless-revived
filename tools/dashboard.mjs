@@ -55,7 +55,7 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
     try {
       const started = performance.now();
       const get = async route => {
-        const response = await fetcher(new URL(route, target), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(3000), redirect: 'error'});
+        const response = await fetcher(new URL(route, target), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(8000), redirect: 'error'});
         if (!response.ok) throw new Error('Backend unavailable or owner key rejected');
         return response.json();
       };
@@ -129,17 +129,20 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
       return;
     }
     if (req.url?.startsWith('/api/accounts?')) {
-      const offset = new URL(req.url, 'http://localhost').searchParams.get('offset');
+      const params=new URL(req.url,'http://localhost').searchParams;
+      const query=(params.get('q') || '').trim();
+      if(query.length>100){res.writeHead(400).end();return;}
+      const offset = params.get('offset');
       if (!/^\d{1,8}$/.test(offset || '') || Number(offset) > 10000000) { res.writeHead(400).end(); return; }
       if (readingAccounts) { res.writeHead(429).end(); return; }
       readingAccounts = true;
       try {
-        const response = await fetcher(new URL(`/undaunted/api/DashboardAccounts?offset=${Number(offset)}`, target), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(3000), redirect: 'error'});
+        const response = await fetcher(new URL(`/undaunted/api/DashboardAccounts?offset=${Number(offset)}&q=${encodeURIComponent(query)}`, target), {headers: {'x-undaunted-user-api-key': key}, signal: AbortSignal.timeout(8000), redirect: 'error'});
         if (!response.ok) throw new Error('unavailable');
         const result = await response.json();
         if (!Array.isArray(result.accounts)) throw new Error('invalid');
         // Explicit projection prevents future backend fields (especially credentials) leaking.
-        res.end(JSON.stringify({accounts: result.accounts.slice(0, 100).map(a => ({id: String(a.id), name: String(a.name), admin: a.admin === true,
+        res.end(JSON.stringify({accounts: result.accounts.slice(0, 100).map(a => ({id: String(a.id), name: String(a.name), admin: a.admin === true, developer:a.developer===true,
           keyFingerprint: /^[a-f0-9]{16}$/.test(a.keyFingerprint || '') ? a.keyFingerprint : null})),
           nextOffset: Number.isSafeInteger(result.nextOffset) && result.nextOffset > Number(offset) && result.nextOffset <= 10000000 ? result.nextOffset : null}));
       } catch { res.writeHead(503).end(JSON.stringify({error: 'Account directory unavailable. Update the metagame if this route is missing.'})); }

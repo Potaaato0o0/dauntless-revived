@@ -13,7 +13,7 @@ test('fleet totals sum RAM and hunts and label the unweighted CPU mean',()=>{
 test('offline or stale server cannot produce a misleading fleet total',()=>{
   const f=fleetSummary(main,{...worker,online:false},null,now);
   assert.equal(f.totals.meanCpu,null);assert.equal(f.totals.hunts,null);assert.equal(f.totals.ramUsedMB,null);
-  assert.equal(fleetSummary(main,worker,null,now+16000).totals.online,0);
+  assert.equal(fleetSummary(main,worker,null,now+31000).totals.online,0);
   assert.equal(fleetSummary({...main,performance:null},worker,null,now).totals.hunts,null);
 });
 test('three-server fleet includes AUS and excludes persistent worlds from worker hunt totals',()=>{

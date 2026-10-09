@@ -18,7 +18,7 @@ $script:DRPinned = @{
     # Undaunted's prebuilt DLLs, kept in UndauntedLauncher/assets/ (same pins as friend-kit/).
     Dlls            = [ordered]@{
         'dxgi.dll'                    = '9A431D7B6FD20C43FA92BEBD91C3BC023EC7A3FCBC52871C41F4DF293D4B0D1F'
-        'UndauntedInternalServer.dll' = 'D294D96BE21B729BFA0305F9528071A8088D3B1B60EA27AC91AC17B0FE06D2C2'
+        'UndauntedInternalServer.dll' = 'BAF05FC1F195820E770805B9E28475019459E82C194AA55ABC9CF4B1C24AA0B4'
     }
     # Node.js LTS: the version the fork is developed and tested on. better-sqlite3 is a native
     # module built for this Node major version. SHA-256 from nodejs.org/dist/v24.19.0/SHASUMS256.txt;
