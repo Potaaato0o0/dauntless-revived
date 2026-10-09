@@ -61,7 +61,7 @@ local PATH = "/Game/UI/EndOfHunt/StackableProgressBar.StackableProgressBar_C"
 local ASSET = "/Game/UI/EndOfHunt/StackableProgressBar"
 local HUD = "/Game/UI/HUD/HealthStamina_bpw.HealthStamina_bpw_C:WidgetTree."
 
-local SHOW_TEXT = true
+local SHOW_TEXT = false
 local TEXT_PATH = "/Game/UI/Chat/w_chat_log_label_bpw.w_chat_log_label_bpw_C"
 local TEXT_ASSET = "/Game/UI/Chat/w_chat_log_label_bpw"
 local SRC_TEXT = "HealthValueText"
