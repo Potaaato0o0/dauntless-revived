@@ -2,8 +2,8 @@ import {cpuAdmission} from '../controllers/cpuadmission';
 import { Router } from "express";
 import { DescribeGameservers, huntAdmission, Gameservers } from "../controllers/gameservers";
 import { NativeOccupancy, NativeCityOccupancy } from '../controllers/nativeoccupancy';
-import { DescribeOverflow } from '../controllers/overflow';
-import { DescribeAus } from '../controllers/regions';
+import { DescribeOverflowSnapshot } from '../controllers/overflow';
+import { DescribeAusSnapshot } from '../controllers/regions';
 
 export const gameserversRouter = Router();
 
@@ -33,13 +33,14 @@ gameserversRouter.get("/gameservers", async (req, res) => {
         return;
     }
 
-    const [overflow, aus, germany] = await Promise.all([DescribeOverflow(), DescribeAus(), DescribeAus('ger')]);
+    const [overflow, aus, germany] = await Promise.all([DescribeOverflowSnapshot(), DescribeAusSnapshot(), DescribeAusSnapshot('ger')]);
     res.status(200);
     res.json({
         servers: [...DescribeGameservers().map(server => {
             const process=Gameservers.find(s=>s.id===server.id);
             return {...server, connectedPlayers: process ? (process.isRamsgate ? NativeCityOccupancy(process.processId,process.startTime) : NativeOccupancy(process.processId,process.startTime)) : undefined};
-        }), ...overflow, ...aus, ...germany],
+        }), ...overflow.servers, ...aus.servers, ...germany.servers],
+        complete: overflow.complete && aus.complete && germany.complete,
         capacity: {...huntAdmission.status(), cpu:cpuAdmission.status()}
     });
 });

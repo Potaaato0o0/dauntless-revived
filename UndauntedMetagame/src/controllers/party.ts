@@ -52,8 +52,12 @@ export type PartyCandidate = {
     HuntId: string,
     MemberIds: string[],       // who was taken along, in party order
     Served: Set<string>,       // members already told to travel
+    ServedAt?: Map<string, number>, // immutable first travel time for restored entries
     Host?: string,
     Port?: number,
+    SessionId?: string,
+    AllocatedAt?: number,
+    LaunchDeadline?: number,
     CreatedAt: number,
     LastServedAt?: number
 };
@@ -244,7 +248,9 @@ function ExpireCandidate(TheParty: Party){
     else if(AllServed && Candidate.LastServedAt !== undefined && Now - Candidate.LastServedAt > CANDIDATE_LINGER_MS){
         Why = "every member was sent to the server";
     }
-    else if(Now - Candidate.CreatedAt > CANDIDATE_MAX_AGE_MS){
+    else if(Candidate.State === 'MATCHING' && Candidate.LaunchDeadline !== undefined
+        ? Now > Candidate.LaunchDeadline
+        : Now - (Candidate.AllocatedAt ?? Candidate.CreatedAt) > CANDIDATE_MAX_AGE_MS){
         Why = "too old";
     }
 
@@ -867,12 +873,14 @@ export function ClearPartyCandidate(TheParty: Party, CandidateId: string, Why: s
 }
 
 // A member was told to travel to the candidate's server
-export function MarkPartyCandidateServed(UserId: string, CandidateId: string){
+export function MarkPartyCandidateServed(UserId: string, CandidateId: string, FirstSentAt = Clock()){
     const Candidate = GetPartyOf(UserId)?.Candidate;
 
     if(Candidate != null && Candidate.CandidateId === CandidateId){
         if(!Candidate.Served.has(UserId)){
             Candidate.Served.add(UserId);
+            Candidate.ServedAt ??= new Map<string, number>();
+            Candidate.ServedAt.set(UserId, FirstSentAt);
             Candidate.LastServedAt = Clock();
         }
     }

@@ -3,6 +3,7 @@ import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth
 import { logger } from "../logger";
 import { GameSessionForCandidate } from "../controllers/matchmaking";
 import { CancelMatchmaking, CheckAndUpdateQueueStatus, DecideCandidateStatus, HandlePlayerMatchmaking, JoinPartyCandidateById, LeaveCandidate, MatchmakingResult } from "../controllers/matchmaking";
+import { MatchmakingRoster } from "../controllers/matchmakingroster";
 
 export const matchmakingRouter = Router();
 
@@ -44,14 +45,46 @@ matchmakingRouter.delete("/candidate/leave", CancelOn, HasUndauntedMetagameAuth,
     res.json({});
 });
 
-// A hunt server waiting for its players asks which ones it should still expect.
-// Echoing its own list changes nothing (a same-length list is ignored).
+function NativeSessionId(value: unknown) {
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+        ? value.toLowerCase() : undefined;
+}
+
+function ConnectedPlayerSnapshot(value: unknown): string[] | undefined {
+    if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 8192) return undefined;
+    try {
+        const ids: unknown = JSON.parse(value);
+        if (!Array.isArray(ids) || ids.length > 128
+            || ids.some(id => typeof id !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(id))
+            || new Set(ids).size !== ids.length) return undefined;
+        return ids;
+    } catch {
+        return undefined;
+    }
+}
+
+// The native request contains the complete expected roster, including players who
+// already arrived. Only a complete connection snapshot from that deployment can
+// distinguish a missing player from a connected player who stopped matchmaking.
+// An absent/incomplete snapshot preserves unresolved members; legacy or unknown
+// deployments retain their roster, including after a metagame restart.
 matchmakingRouter.post("/candidate/player/alive", MiscRoutesOn, HasUndauntedMetagameAuth, (req: any, res) => {
     const PlayerIds = Array.isArray(req.body?.playerIds) ? req.body.playerIds.filter((Id: unknown) => typeof Id === "string") : [];
+    const SessionHeader = req.headers['x-dauntless-game-session-id'];
+    const HeaderSessionId = NativeSessionId(SessionHeader);
+    const QuerySessionId = NativeSessionId(req.query.sessionId);
+    const SessionId = SessionHeader === undefined ? QuerySessionId : HeaderSessionId;
+    const MatchingSession = req.query.sessionId === undefined || QuerySessionId === SessionId;
+    const ExpectedPurpose = req.query.purpose === 'expected' || (HeaderSessionId !== undefined && req.query.purpose === undefined);
+    const ExpectedPlayerIds = req.AuthData.IsGameserver === true && SessionId && MatchingSession && ExpectedPurpose
+        ? MatchmakingRoster.reconcileExpected(PlayerIds, {
+            sessionId: SessionId,
+            connectedPlayerIds: HeaderSessionId ? ConnectedPlayerSnapshot(req.headers['x-dauntless-connected-player-ids']) : undefined
+        }) : PlayerIds;
 
     res.status(200);
     res.json({
-        expectedPlayerIds: PlayerIds
+        expectedPlayerIds: ExpectedPlayerIds
     });
 });
 

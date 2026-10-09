@@ -72,13 +72,28 @@ export class HuntRouter {
     }
 }
 
-export async function DescribeOverflow(): Promise<any[]> {
-    const url = OverflowUrl();
-    if (!url) return [];
+export type GameserverSnapshot = { servers: any[]; complete: boolean };
+
+// An empty result from an unreachable worker is not evidence that its sessions died.
+// Preserve that distinction for matchmaking's cached-allocation liveness checks.
+export async function ReadWorkerSnapshot(url: URL): Promise<GameserverSnapshot> {
     try {
         const response = await fetch(new URL('/gameservers', url), {signal: AbortSignal.timeout(1500), redirect: 'error'});
-        if (!response.ok) return [];
+        if (!response.ok) { await response.body?.cancel(); return {servers: [], complete: false}; }
         const body = await response.json() as any;
-        return Array.isArray(body.servers) ? body.servers.map((server: any) => ({...server, host: 'overflow'})) : [];
-    } catch { return []; }
+        if (!Array.isArray(body.servers)) return {servers: [], complete: false};
+        // Older workers do not report whether their own remote snapshots succeeded.
+        return {servers: body.servers, complete: body.complete === true};
+    } catch { return {servers: [], complete: false}; }
+}
+
+export async function DescribeOverflowSnapshot(): Promise<GameserverSnapshot> {
+    const url = OverflowUrl();
+    if (!url) return {servers: [], complete: true};
+    const snapshot = await ReadWorkerSnapshot(url);
+    return {...snapshot, servers: snapshot.servers.map(server => ({...server, host: 'overflow'}))};
+}
+
+export async function DescribeOverflow(): Promise<any[]> {
+    return (await DescribeOverflowSnapshot()).servers;
 }

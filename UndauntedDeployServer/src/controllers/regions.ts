@@ -1,5 +1,5 @@
 import { CapacityUnavailable } from './capacity';
-import { RemoteLaunch } from './overflow';
+import { RemoteLaunch, ReadWorkerSnapshot, GameserverSnapshot } from './overflow';
 
 export type RegionChoice = 'main' | 'aus' | 'ger' | 'mixed';
 type Request = Parameters<typeof RemoteLaunch>[1];
@@ -15,15 +15,14 @@ export function AusUrl(region: 'aus' | 'ger' = 'aus') {
 export function Utilization(load: Load) {
     return load.limit && load.limit > 0 ? (load.running + load.pending) / load.limit : Infinity;
 }
-export async function DescribeAus(region: 'aus' | 'ger' = 'aus'): Promise<any[]> {
+export async function DescribeAusSnapshot(region: 'aus' | 'ger' = 'aus'): Promise<GameserverSnapshot> {
     const url = AusUrl(region);
-    if (!url) return [];
-    try {
-        const response = await fetch(new URL('/gameservers',url),{signal:AbortSignal.timeout(1500),redirect:'error'});
-        if (!response.ok) return [];
-        const body = await response.json() as any;
-        return Array.isArray(body.servers) ? body.servers.map((server:any)=>({...server,host:region,region})) : [];
-    } catch { return []; }
+    if (!url) return {servers: [], complete: true};
+    const snapshot = await ReadWorkerSnapshot(url);
+    return {...snapshot, servers: snapshot.servers.map(server => ({...server, host: region, region}))};
+}
+export async function DescribeAus(region: 'aus' | 'ger' = 'aus'): Promise<any[]> {
+    return (await DescribeAusSnapshot(region)).servers;
 }
 export class RegionalRouter {
     constructor(private mainLoad: () => Promise<Load>, private remote = RemoteLaunch,
