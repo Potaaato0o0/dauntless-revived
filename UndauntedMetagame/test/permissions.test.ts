@@ -12,7 +12,7 @@ import { gameserverapikeys, userapikeys, users } from "../src/db/schema";
 import { HashUserAPIKey, SignMetagameJWTForUid } from "../src/controllers/auth";
 import { CreateCharacterForUid } from "../src/controllers/character";
 import { CheckMatchmakingInput } from "../src/controllers/matchmaking";
-import { CheckGatewayConfig, ClientAddressOf, IsDirectLocalRequest, IsProxiedRequest, IsTrustedGatewayRequest } from "../src/middleware/RequestOrigin";
+import { CheckGatewayConfig, ClientAddressOf, DescribeOrigin, IsDirectLocalRequest, IsProxiedRequest, IsTrustedGatewayRequest } from "../src/middleware/RequestOrigin";
 import { Count, ReadCharacter } from "./helpers";
 
 // Permission audit (C:\dr\data\plans\route-audit.md): every route is listed with its auth,
@@ -661,6 +661,15 @@ describe("the game server's guild create (POST /guild)", () => {
 });
 
 describe("RequestOrigin", () => {
+    it("keeps IPv4 and IPv6 addresses out of persisted request traces", () => {
+        for(const address of ["203.0.113.7", "2001:db8::7"]){
+            assert.equal(DescribeOrigin(FakeRequest("127.0.0.1", "127.0.0.1", {
+                "x-dauntless-gateway": GATEWAY_TEST_SECRET, "x-forwarded-for": address
+            })), " via=gateway");
+            assert.equal(DescribeOrigin(FakeRequest(address, "127.0.0.1", { via: "proxy" })), " via=proxy");
+            assert.equal(DescribeOrigin(FakeRequest(address, "127.0.0.1")), "");
+        }
+    });
     it("takes X-Forwarded-For only from loopback with the right gateway secret", () => {
         const Right = { "x-dauntless-gateway": GATEWAY_TEST_SECRET };
 

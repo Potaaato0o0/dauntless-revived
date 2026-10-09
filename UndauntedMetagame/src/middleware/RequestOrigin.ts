@@ -193,7 +193,7 @@ export function RefuseAdminKeyThroughProxy(req: Request, res: Response){
 // a login and as an API key. It must never answer anything that came through a proxy.
 export function RefuseProxiedInDevAuthMode(req: Request, res: Response, next: NextFunction){
     if(process.env.AUTH_MODE === "NONE" && process.env.NODE_ENV !== "production" && IsProxiedRequest(req)){
-        logger.warn(`Refusing ${req.method} ${req.path} from ${ClientAddressOf(req)}: AUTH_MODE=NONE does not serve proxied requests`);
+        logger.warn(`Refusing proxied ${req.method} request: AUTH_MODE=NONE does not serve proxied requests`);
 
         res.status(403);
         res.send();
@@ -205,15 +205,14 @@ export function RefuseProxiedInDevAuthMode(req: Request, res: Response, next: Ne
 
 let LastBadSecretWarning = 0;
 
-// For the request trace: "" for a direct request (the live log format stays as it was),
-// " via=gateway ip=<player>" behind the gateway, " via=proxy peer=<addr>" otherwise
+// Persist only the origin category. Player addresses belong in expiring session memory.
 export function DescribeOrigin(req: Request){
     if(!IsProxiedRequest(req)){
         return "";
     }
 
     if(IsTrustedGatewayRequest(req)){
-        return ` via=gateway ip=${ClientAddressOf(req)}`;
+        return " via=gateway";
     }
 
     if(req.headers[GATEWAY_HEADER] !== undefined && Date.now() - LastBadSecretWarning > 60 * 1000){
@@ -221,7 +220,7 @@ export function DescribeOrigin(req: Request){
         logger.warn(`A request carried ${GATEWAY_HEADER} but ${GatewaySecret() == undefined ? "GATEWAY_SECRET is not set" : "not the right secret, or not from loopback"}; its forwarding headers are ignored`);
     }
 
-    return ` via=proxy peer=${ClientAddressOf(req)}`;
+    return " via=proxy";
 }
 
 // Startup check for public mode. Errors stop the server; warnings are logged.

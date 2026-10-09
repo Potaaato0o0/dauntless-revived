@@ -41,8 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 // game-server process (they carry the gameserver API key) rather than a player.
 // Never write credentials to the log: some routes carry a JWT in the path
 // (e.g. DELETE /account/api/oauth/sessions/kill/<token>); see Redact.
-// Behind the public-mode gateway the line ends with " via=gateway ip=<player address>";
-// a direct request keeps the old format.
+// Record the proxy category only; player addresses must not persist in request logs.
 if (process.env.LOG_REQUESTS !== "0") {
     app.use((req, _res, next) => {
         logger.info(`${req.method} ${Redact(req.path)} gs=${req.headers["x-undaunted-gameserver-apikey"] ? 1 : 0}${DescribeOrigin(req)}`);
