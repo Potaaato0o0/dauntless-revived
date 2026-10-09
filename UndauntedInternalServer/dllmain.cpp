@@ -3,6 +3,7 @@
 #include <fstream>
 #include "HuntIdlePolicy.h"
 #include "NativeDiagnostics.h"
+#include "ConnectedPlayerSnapshot.h"
 
 
 #include "ServerFrameLimit.h"
@@ -19,6 +20,7 @@
 #include <ranges>
 #include <cwchar>
 #include <map>
+#include <array>
 
 #include "framework.h"
 #include "SDK.hpp"
@@ -59,6 +61,118 @@ namespace Globals {
     std::wstring MetagameAddress;
 
     bool EnableLogging = true;
+}
+
+static ConnectedPlayerSnapshot::Cache ConnectedPlayers;
+
+static const std::wstring& WorkerGameSessionId() {
+    static const std::wstring Id = [] {
+        wchar_t ReadyFile[32768] = {};
+        const auto Length = GetEnvironmentVariableW(L"DR_SERVER_READY_FILE", ReadyFile, 32768);
+        return Length > 0 && Length < 32768
+            ? ConnectedPlayerSnapshot::SessionIdFromReadyFile(std::wstring_view(ReadyFile, Length)) : std::wstring{};
+    }();
+    return Id;
+}
+
+// Called only from GameEngineTickHook. HTTP workers see copied strings under a
+// mutex, never engine objects or the connection array. Pointer values in Shape
+// are compared only, so a new connection/controller forces an immediate sample.
+static void UpdateConnectedPlayerSnapshot() {
+    if (WorkerGameSessionId().empty()) return;
+    const auto Now = GetTickCount64();
+    static ULONGLONG NextCapture = 0;
+    static std::vector<std::array<std::uintptr_t, 4>> PreviousShape;
+    auto* World = UWorld::GetWorld();
+    auto* Driver = Globals::Listening ? Networking::NetDriver : nullptr;
+    if (!Driver || !World || Driver->World != World || World->NetDriver != Driver || Driver->ServerConnection) {
+        ConnectedPlayers.Publish({}, Now);
+        NextCapture = 0;
+        return;
+    }
+
+    std::vector<std::array<std::uintptr_t, 4>> Shape;
+    std::vector<UNetConnection*> Active;
+    bool Complete = true;
+    int ConnectionCount = 0;
+    const auto Inspect = [&](UNetConnection* Connection) {
+        if (!Connection || ++ConnectionCount > ConnectedPlayerSnapshot::MaxConnections) {
+            Complete = false;
+            return;
+        }
+        const auto State = *reinterpret_cast<const uint32_t*>(reinterpret_cast<uintptr_t>(Connection) + 0x134);
+        if (State != 2 && State != 3) {
+            Shape.push_back({reinterpret_cast<uintptr_t>(Connection), 0, 0, State});
+            if (State != 1) Complete = false; // Only USOCK_Closed is known inactive.
+            return; // A closed/unknown connection may retain stale controller fields.
+        }
+        auto* Controller = Connection->PlayerController;
+        auto* PlayerState = Controller ? Controller->PlayerState : nullptr;
+        Shape.push_back({reinterpret_cast<uintptr_t>(Connection), reinterpret_cast<uintptr_t>(Controller),
+            reinterpret_cast<uintptr_t>(PlayerState), State});
+        if (!Controller || !PlayerState
+            || !Controller->IsA(AArchonPlayerController::StaticClass())
+            || !PlayerState->IsA(AArchonPlayerState::StaticClass())) {
+            Complete = false;
+            return;
+        }
+        Active.push_back(Connection);
+    };
+    const auto ValidCount = [](const auto& Connections) {
+        const int Count = Connections.Num();
+        return Count >= 0 && Count <= ConnectedPlayerSnapshot::MaxConnections
+            && (Count == 0 || Connections.IsValid());
+    };
+    if (!ValidCount(Driver->ClientConnections)) Complete = false;
+    else for (auto* Connection : Driver->ClientConnections) {
+        Inspect(Connection);
+        if (!Connection) continue;
+        if (!ValidCount(Connection->Children)) { Complete = false; continue; }
+        for (auto* Child : Connection->Children) {
+            Inspect(Child);
+            // UE child connections are one level deep. An unexpected structure
+            // makes the snapshot incomplete instead of silently losing players.
+            if (!Child || Child->Parent != Connection || Child->Children.Num() != 0) Complete = false;
+        }
+    }
+    if (!Complete) {
+        ConnectedPlayers.Publish({}, Now);
+        NextCapture = 0;
+        return;
+    }
+    if (Now < NextCapture && Shape == PreviousShape) return;
+
+    ConnectedPlayerSnapshot::Builder Snapshot;
+    auto* GameplayStatics = Active.empty() ? nullptr : UArchonGameplayStatics::StaticClass();
+    if (!Active.empty() && (!GameplayStatics
+        || !GameplayStatics->GetFunction("ArchonGameplayStatics", "IsValidNetId")
+        || !UArchonGameplayStatics::GetDefaultObj())) {
+        ConnectedPlayers.Publish({}, Now);
+        PreviousShape = std::move(Shape);
+        NextCapture = Now + 1000;
+        return;
+    }
+    for (auto* Connection : Active) {
+        auto* PlayerState = static_cast<AArchonPlayerState*>(Connection->PlayerController->PlayerState);
+        // The generated wrapper assumes this function exists. Check it first so
+        // an incompatible class cannot turn an unknown identity into a crash.
+        if (!PlayerState->Class->GetFunction("ArchonPlayerState", "GetUniqueIdAsString")
+            || !UArchonGameplayStatics::IsValidNetId(PlayerState->UniqueId)) {
+            Snapshot.Invalidate();
+            break;
+        }
+        const auto Id = PlayerState->GetUniqueIdAsString();
+        if (!Id.IsValid() || Id.Num() < 2
+            || Id.Num() > static_cast<int>(ConnectedPlayerSnapshot::MaxPlayerIdLength + 1)
+            || Id.CStr()[Id.Num() - 1] != L'\0') {
+            Snapshot.Invalidate();
+            break;
+        }
+        Snapshot.AddConnection(3, std::wstring_view(Id.CStr(), Id.Num() - 1));
+    }
+    ConnectedPlayers.Publish(Snapshot.Header(), Now);
+    PreviousShape = std::move(Shape);
+    NextCapture = Now + 1000;
 }
 
 std::map<std::wstring, std::wstring> EndpointMap = {};
@@ -398,6 +512,8 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         Globals::Listening = Networking::Listen(UEngine::GetEngine(), Globals::Port);
     }
 
+    UpdateConnectedPlayerSnapshot();
+
     if (Globals::Listening && Networking::NetDriver) {
         bool HasConnection = false;
         int ActiveConnections = 0;
@@ -467,7 +583,21 @@ char ProcessRequest(void* Request) {
     FString APIHeader(L"x-undaunted-gameserver-apikey");
     FString APIKey(Globals::ServerAPIKey);
 
-    reinterpret_cast<void(*)(void*, FString*, FString*)>(Globals::BaseAddress + 0x28AAAA0)(Request, &APIHeader, &APIKey);
+    const auto SetHeader = reinterpret_cast<void(*)(void*, FString*, FString*)>(Globals::BaseAddress + 0x28AAAA0);
+    SetHeader(Request, &APIHeader, &APIKey);
+
+    const auto& SessionId = WorkerGameSessionId();
+    if (!SessionId.empty()) {
+        const auto Snapshot = ConnectedPlayers.Read(GetTickCount64());
+        FString SessionHeader(L"x-dauntless-game-session-id");
+        FString SessionValue(SessionId.c_str());
+        FString ConnectedHeader(L"x-dauntless-connected-player-ids");
+        FString ConnectedValue(Snapshot.c_str());
+        SetHeader(Request, &SessionHeader, &SessionValue);
+        // Clear a previous value on a reused/retried HTTP request too. Empty is
+        // deliberately invalid JSON and means unknown, while [] means empty.
+        SetHeader(Request, &ConnectedHeader, &ConnectedValue);
+    }
 
     return reinterpret_cast<char(*)(void*)>(OrigProcessRequest)(Request);
 }
@@ -867,6 +997,7 @@ int NetModeHook(void* a1) { //char __fastcall UArchonStaminaComponent_TryConsume
 
 void InitServerHooks() {
     MH_Initialize();
+    Networking::InitChannelTracking(Globals::BaseAddress);
 
     // SYSTEM and service accounts do not inherit a launcher-generated Game.ini.
     // The worker reaches the same backend through its loopback SSH tunnel.

@@ -8,6 +8,8 @@ using namespace SDK;
 namespace Networking {
 	extern UNetDriver* NetDriver;
 
+	void InitChannelTracking(uintptr_t ImageBase);
+
 	bool Listen(UEngine* Engine, int Port);
 
 	void TickNetworking();
